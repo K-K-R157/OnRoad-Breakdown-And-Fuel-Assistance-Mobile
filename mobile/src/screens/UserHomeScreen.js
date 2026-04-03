@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -10,10 +11,13 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
+import * as ImagePicker from "expo-image-picker";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
 import {
   chargingStationAPI,
@@ -78,8 +82,14 @@ const CONNECTOR_TYPES = [
 
 export default function UserHomeScreen() {
   const { session, logout } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { height: viewportHeight } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState("mechanic");
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const profileModalMaxHeight = Math.max(
+    420,
+    viewportHeight - insets.top - insets.bottom - spacing.xl,
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -92,14 +102,10 @@ export default function UserHomeScreen() {
           <View style={styles.avatarCircle}>
             <Ionicons name="person" size={20} color={colors.brand.primary} />
           </View>
-          <View>
-            <Text style={styles.profileLabel}>Profile</Text>
+          <View style={styles.headerTextWrap}>
             <Text style={styles.userName}>{session?.user?.name || "User"}</Text>
+            <Text style={styles.roleTitle}>User Account</Text>
           </View>
-        </Pressable>
-        <Pressable style={styles.logoutButton} onPress={logout}>
-          <Ionicons name="log-out-outline" size={22} color={colors.error} />
-          <Text style={styles.logoutText}>Logout</Text>
         </Pressable>
       </View>
 
@@ -143,19 +149,53 @@ export default function UserHomeScreen() {
       )}
 
       {/* Profile Modal */}
-      <Modal visible={showProfileModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>My Profile</Text>
-              <Pressable onPress={() => setShowProfileModal(false)}>
-                <Ionicons name="close" size={24} color={colors.text.muted} />
+      <Modal
+        visible={showProfileModal}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+      >
+        <View
+          style={[
+            styles.modalOverlay,
+            {
+              paddingTop: insets.top + spacing.sm,
+              paddingBottom: insets.bottom + spacing.xs,
+            },
+          ]}
+        >
+          <View
+            style={[styles.modalContent, { height: profileModalMaxHeight }]}
+          >
+            <View style={[styles.modalHeader, styles.profileModalHeader]}>
+              <Pressable
+                style={styles.profileModalIconBtn}
+                onPress={() => setShowProfileModal(false)}
+              >
+                <Ionicons
+                  name="arrow-back"
+                  size={22}
+                  color={colors.text.secondary}
+                />
+              </Pressable>
+              <Text style={[styles.modalTitle, styles.profileModalTitle]}>
+                My Profile
+              </Text>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.profileModalLogoutAction,
+                  pressed && styles.profileModalLogoutActionPressed,
+                ]}
+                onPress={logout}
+              >
+                <Text style={styles.profileModalLogoutText}>Logout</Text>
               </Pressable>
             </View>
             <ProfileTab
               token={session?.token}
               user={session?.user}
               onClose={() => setShowProfileModal(false)}
+              bottomInset={insets.bottom}
             />
           </View>
         </View>
@@ -164,10 +204,25 @@ export default function UserHomeScreen() {
   );
 }
 
+const RANGE_OPTIONS = [
+  { value: 5000, label: "5 km" },
+  { value: 10000, label: "10 km" },
+  { value: 15000, label: "15 km" },
+  { value: 25000, label: "25 km" },
+  { value: 50000, label: "50 km" },
+];
+
+const PAYMENT_METHODS = [
+  { value: "cash", label: "Cash", icon: "cash-outline" },
+  { value: "upi", label: "UPI", icon: "phone-portrait-outline" },
+  { value: "card", label: "Card", icon: "card-outline" },
+];
+
 function MechanicTab({ token }) {
   const [latitude, setLatitude] = useState("12.9716");
   const [longitude, setLongitude] = useState("77.5946");
   const [mechanicType, setMechanicType] = useState("");
+  const [searchRange, setSearchRange] = useState(10000);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -176,8 +231,47 @@ function MechanicTab({ token }) {
 
   const [problemDescription, setProblemDescription] = useState("");
   const [address, setAddress] = useState("");
+  const [problemImage, setProblemImage] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [showRequestModal, setShowRequestModal] = useState(false);
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      setError("Permission to access gallery denied");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setProblemImage(result.assets[0].uri);
+    }
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      setError("Permission to access camera denied");
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setProblemImage(result.assets[0].uri);
+    }
+  };
 
   const detectLocation = async () => {
     setLocationLoading(true);
@@ -205,10 +299,15 @@ function MechanicTab({ token }) {
       const res = await mechanicAPI.getNearby(
         Number(longitude),
         Number(latitude),
-        10000,
+        searchRange,
         { mechanicType: mechanicType || undefined },
       );
       setList(res?.data || []);
+      if ((res?.data || []).length === 0) {
+        setError(
+          `No mechanics found within ${searchRange / 1000} km. Try increasing the search range.`,
+        );
+      }
     } catch (err) {
       setError(err.message || "Could not load mechanics");
     } finally {
@@ -229,7 +328,9 @@ function MechanicTab({ token }) {
       await userAPI.createMechanicRequest(token, {
         mechanicId: selectedProvider._id,
         problemDescription,
+        images: problemImage ? [problemImage] : undefined,
         address: address || "GPS Location",
+        paymentMethod,
         location: {
           type: "Point",
           coordinates: [Number(longitude), Number(latitude)],
@@ -238,6 +339,8 @@ function MechanicTab({ token }) {
       setSuccess("Request sent! The mechanic will respond shortly.");
       setProblemDescription("");
       setAddress("");
+      setProblemImage(null);
+      setPaymentMethod("cash");
       setShowRequestModal(false);
       setSelectedProvider(null);
     } catch (err) {
@@ -249,6 +352,7 @@ function MechanicTab({ token }) {
 
   const openRequestModal = (provider) => {
     setSelectedProvider(provider);
+    setProblemImage(null);
     setShowRequestModal(true);
     setError("");
     setSuccess("");
@@ -336,6 +440,24 @@ function MechanicTab({ token }) {
             icon={type.emoji}
             selected={mechanicType === type.id}
             onPress={() => setMechanicType(type.id)}
+          />
+        ))}
+      </ScrollView>
+
+      {/* Search Range */}
+      <Text style={styles.filterLabel}>Search Range</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
+      >
+        {RANGE_OPTIONS.map((range) => (
+          <FilterChip
+            key={range.value}
+            label={range.label}
+            icon="📍"
+            selected={searchRange === range.value}
+            onPress={() => setSearchRange(range.value)}
           />
         ))}
       </ScrollView>
@@ -430,6 +552,41 @@ function MechanicTab({ token }) {
               numberOfLines={4}
             />
 
+            {/* Image Picker */}
+            <Text style={styles.inputLabel}>Add Photo (optional)</Text>
+            <View style={styles.imagePickerRow}>
+              <Pressable style={styles.imagePickerBtn} onPress={takePhoto}>
+                <Ionicons
+                  name="camera-outline"
+                  size={24}
+                  color={colors.brand.primary}
+                />
+                <Text style={styles.imagePickerText}>Camera</Text>
+              </Pressable>
+              <Pressable style={styles.imagePickerBtn} onPress={pickImage}>
+                <Ionicons
+                  name="image-outline"
+                  size={24}
+                  color={colors.brand.primary}
+                />
+                <Text style={styles.imagePickerText}>Gallery</Text>
+              </Pressable>
+            </View>
+            {problemImage && (
+              <View style={styles.imagePreviewWrap}>
+                <Image
+                  source={{ uri: problemImage }}
+                  style={styles.imagePreview}
+                />
+                <Pressable
+                  style={styles.removeImageBtn}
+                  onPress={() => setProblemImage(null)}
+                >
+                  <Ionicons name="close" size={16} color="#fff" />
+                </Pressable>
+              </View>
+            )}
+
             <Text style={styles.inputLabel}>Address (optional)</Text>
             <TextInput
               style={styles.input}
@@ -438,6 +595,45 @@ function MechanicTab({ token }) {
               placeholder="Enter your address"
               placeholderTextColor={colors.text.muted}
             />
+            <Text style={styles.gpsHint}>
+              <Ionicons name="location" size={12} color={colors.text.muted} />{" "}
+              GPS location will be used if left empty
+            </Text>
+
+            {/* Payment Method Selection */}
+            <Text style={styles.inputLabel}>Payment Method</Text>
+            <View style={styles.paymentMethodsWrap}>
+              {PAYMENT_METHODS.map((method) => (
+                <Pressable
+                  key={method.value}
+                  style={[
+                    styles.paymentMethodBtn,
+                    paymentMethod === method.value &&
+                      styles.paymentMethodBtnActive,
+                  ]}
+                  onPress={() => setPaymentMethod(method.value)}
+                >
+                  <Ionicons
+                    name={method.icon}
+                    size={18}
+                    color={
+                      paymentMethod === method.value
+                        ? colors.text.inverse
+                        : colors.text.secondary
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.paymentMethodText,
+                      paymentMethod === method.value &&
+                        styles.paymentMethodTextActive,
+                    ]}
+                  >
+                    {method.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
 
             <ErrorMessage message={error} />
 
@@ -539,6 +735,7 @@ function FuelTab({ token }) {
   const [latitude, setLatitude] = useState("12.9716");
   const [longitude, setLongitude] = useState("77.5946");
   const [fuelTypeFilter, setFuelTypeFilter] = useState("");
+  const [searchRange, setSearchRange] = useState(10000);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -549,6 +746,7 @@ function FuelTab({ token }) {
   const [fuelType, setFuelType] = useState("Petrol");
   const [quantity, setQuantity] = useState("10");
   const [address, setAddress] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [showRequestModal, setShowRequestModal] = useState(false);
 
   const detectLocation = async () => {
@@ -577,10 +775,15 @@ function FuelTab({ token }) {
       const res = await fuelStationAPI.getNearby(
         Number(longitude),
         Number(latitude),
-        10000,
+        searchRange,
         { fuelType: fuelTypeFilter || undefined },
       );
       setList(res?.data || []);
+      if ((res?.data || []).length === 0) {
+        setError(
+          `No fuel stations found within ${searchRange / 1000} km. Try increasing the search range.`,
+        );
+      }
     } catch (err) {
       setError(err.message || "Could not load fuel stations");
     } finally {
@@ -616,6 +819,7 @@ function FuelTab({ token }) {
           Number(quantity) * selectedFuel.price +
           (selectedProvider.deliveryCharges || 0),
         address: address || "GPS Location",
+        paymentMethod,
         deliveryLocation: {
           type: "Point",
           coordinates: [Number(longitude), Number(latitude)],
@@ -624,6 +828,7 @@ function FuelTab({ token }) {
       setSuccess("Fuel request submitted! Track it in Requests tab.");
       setShowRequestModal(false);
       setSelectedProvider(null);
+      setPaymentMethod("cash");
     } catch (err) {
       setError(err.message || "Failed to create request");
     } finally {
@@ -664,7 +869,10 @@ function FuelTab({ token }) {
 
         {/* GPS Detection Button */}
         <Pressable
-          style={[styles.gpsButton, locationLoading && styles.gpsButtonDisabled]}
+          style={[
+            styles.gpsButton,
+            locationLoading && styles.gpsButtonDisabled,
+          ]}
           onPress={locationLoading ? null : detectLocation}
         >
           <Ionicons
@@ -727,6 +935,24 @@ function FuelTab({ token }) {
         ))}
       </ScrollView>
 
+      {/* Search Range */}
+      <Text style={styles.filterLabel}>Search Range</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
+      >
+        {RANGE_OPTIONS.map((range) => (
+          <FilterChip
+            key={range.value}
+            label={range.label}
+            icon="📍"
+            selected={searchRange === range.value}
+            onPress={() => setSearchRange(range.value)}
+          />
+        ))}
+      </ScrollView>
+
       {/* Search Button */}
       <Button
         title="Search Fuel Stations"
@@ -783,106 +1009,160 @@ function FuelTab({ token }) {
               </Pressable>
             </View>
 
-            {selectedProvider && (
-              <View style={styles.selectedProviderInfo}>
-                <IconCircle icon="flame" color={colors.brand.amber} size={44} />
-                <View style={styles.selectedProviderText}>
-                  <Text style={styles.selectedProviderName}>
-                    {selectedProvider.stationName}
-                  </Text>
-                  <View style={styles.ratingRow}>
-                    <RatingStars
-                      rating={selectedProvider.rating || 0}
-                      size={14}
-                    />
-                    <Text style={styles.ratingText}>
-                      ({selectedProvider.totalRatings || 0})
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={[
+                styles.modalScrollContent,
+                styles.orderModalScrollContent,
+              ]}
+            >
+              {selectedProvider && (
+                <View style={styles.selectedProviderInfo}>
+                  <IconCircle
+                    icon="flame"
+                    color={colors.brand.amber}
+                    size={44}
+                  />
+                  <View style={styles.selectedProviderText}>
+                    <Text style={styles.selectedProviderName}>
+                      {selectedProvider.stationName}
                     </Text>
+                    <View style={styles.ratingRow}>
+                      <RatingStars
+                        rating={selectedProvider.rating || 0}
+                        size={14}
+                      />
+                      <Text style={styles.ratingText}>
+                        ({selectedProvider.totalRatings || 0})
+                      </Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-            )}
+              )}
 
-            <Text style={styles.inputLabel}>Fuel Type</Text>
-            <View style={styles.pickerWrap}>
-              <Picker
-                selectedValue={fuelType}
-                onValueChange={setFuelType}
-                style={styles.picker}
-                dropdownIconColor={colors.text.secondary}
-              >
-                {selectedProvider?.fuelTypes
-                  ?.filter((f) => f.available)
-                  .map((f) => (
-                    <Picker.Item
-                      key={f.type}
-                      label={`${f.type} - ₹${f.price}/L`}
-                      value={f.type}
-                      color={colors.text.primary}
+              <Text style={styles.inputLabel}>Fuel Type</Text>
+              <View style={styles.pickerWrap}>
+                <Picker
+                  selectedValue={fuelType}
+                  onValueChange={setFuelType}
+                  style={styles.picker}
+                  dropdownIconColor={colors.text.secondary}
+                  mode="dropdown"
+                >
+                  {selectedProvider?.fuelTypes
+                    ?.filter((f) => f.available)
+                    .map((f) => (
+                      <Picker.Item
+                        key={f.type}
+                        label={`${f.type} - ₹${f.price}/L`}
+                        value={f.type}
+                        style={styles.pickerItem}
+                      />
+                    ))}
+                </Picker>
+              </View>
+
+              <Text style={styles.inputLabel}>Quantity (Liters)</Text>
+              <TextInput
+                style={styles.input}
+                value={quantity}
+                onChangeText={setQuantity}
+                placeholder="Enter quantity"
+                placeholderTextColor={colors.text.muted}
+                keyboardType="numeric"
+              />
+
+              <Text style={styles.inputLabel}>Address (optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Delivery address"
+                placeholderTextColor={colors.text.muted}
+              />
+              <Text style={styles.gpsHint}>
+                <Ionicons name="location" size={12} color={colors.text.muted} />{" "}
+                GPS location will be used if left empty
+              </Text>
+
+              {/* Payment Method Selection */}
+              <Text style={styles.inputLabel}>Payment Method</Text>
+              <View style={styles.paymentMethodsWrap}>
+                {PAYMENT_METHODS.map((method) => (
+                  <Pressable
+                    key={method.value}
+                    style={[
+                      styles.paymentMethodBtn,
+                      paymentMethod === method.value &&
+                        styles.paymentMethodBtnActive,
+                    ]}
+                    onPress={() => setPaymentMethod(method.value)}
+                  >
+                    <Ionicons
+                      name={method.icon}
+                      size={18}
+                      color={
+                        paymentMethod === method.value
+                          ? colors.text.inverse
+                          : colors.text.secondary
+                      }
                     />
-                  ))}
-              </Picker>
-            </View>
-
-            <Text style={styles.inputLabel}>Quantity (Liters)</Text>
-            <TextInput
-              style={styles.input}
-              value={quantity}
-              onChangeText={setQuantity}
-              placeholder="Enter quantity"
-              placeholderTextColor={colors.text.muted}
-              keyboardType="numeric"
-            />
-
-            <Text style={styles.inputLabel}>Address (optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={address}
-              onChangeText={setAddress}
-              placeholder="Delivery address"
-              placeholderTextColor={colors.text.muted}
-            />
-
-            {/* Price Summary */}
-            <View style={styles.priceSummary}>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>
-                  Fuel ({quantity}L × ₹{selectedFuelPrice})
-                </Text>
-                <Text style={styles.priceValue}>
-                  ₹{(Number(quantity) * selectedFuelPrice).toFixed(2)}
-                </Text>
+                    <Text
+                      style={[
+                        styles.paymentMethodText,
+                        paymentMethod === method.value &&
+                          styles.paymentMethodTextActive,
+                      ]}
+                    >
+                      {method.label}
+                    </Text>
+                  </Pressable>
+                ))}
               </View>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Delivery Charges</Text>
-                <Text style={styles.priceValue}>
-                  ₹{selectedProvider?.deliveryCharges || 0}
-                </Text>
-              </View>
-              <View style={[styles.priceRow, styles.totalRow]}>
-                <Text style={styles.totalLabel}>Total</Text>
-                <Text style={styles.totalValue}>₹{totalPrice.toFixed(2)}</Text>
-              </View>
-            </View>
 
-            <ErrorMessage message={error} />
+              {/* Price Summary */}
+              <View style={styles.priceSummary}>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>
+                    Fuel ({quantity}L × ₹{selectedFuelPrice})
+                  </Text>
+                  <Text style={styles.priceValue}>
+                    ₹{(Number(quantity) * selectedFuelPrice).toFixed(2)}
+                  </Text>
+                </View>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Delivery Charges</Text>
+                  <Text style={styles.priceValue}>
+                    ₹{selectedProvider?.deliveryCharges || 0}
+                  </Text>
+                </View>
+                <View style={[styles.priceRow, styles.totalRow]}>
+                  <Text style={styles.totalLabel}>Total</Text>
+                  <Text style={styles.totalValue}>
+                    ₹{totalPrice.toFixed(2)}
+                  </Text>
+                </View>
+              </View>
 
-            <View style={styles.modalButtons}>
-              <Button
-                title="Cancel"
-                variant="secondary"
-                onPress={() => setShowRequestModal(false)}
-                style={styles.modalButton}
-              />
-              <Button
-                title="Place Order"
-                icon="cart-outline"
-                onPress={sendRequest}
-                loading={loading}
-                variant="amber"
-                style={styles.modalButton}
-              />
-            </View>
+              <ErrorMessage message={error} />
+
+              <View style={[styles.modalButtons, styles.orderModalButtons]}>
+                <Button
+                  title="Cancel"
+                  variant="secondary"
+                  onPress={() => setShowRequestModal(false)}
+                  style={styles.modalButton}
+                />
+                <Button
+                  title="Place Order"
+                  icon="cart-outline"
+                  onPress={sendRequest}
+                  loading={loading}
+                  variant="amber"
+                  style={styles.modalButton}
+                />
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -954,6 +1234,31 @@ function FuelStationCard({ station, onOrder }) {
         ))}
       </View>
 
+      {/* Service Details */}
+      <View style={styles.serviceDetailsWrap}>
+        <View style={styles.serviceDetailItem}>
+          <Ionicons name="cash-outline" size={14} color={colors.text.muted} />
+          <Text style={styles.serviceDetailText}>
+            Delivery: ₹{station.deliveryCharges || 0}
+          </Text>
+        </View>
+        <View style={styles.serviceDetailItem}>
+          <Ionicons name="cart-outline" size={14} color={colors.text.muted} />
+          <Text style={styles.serviceDetailText}>
+            Min:{" "}
+            {station.minimumOrder
+              ? `₹${station.minimumOrder}`
+              : `${station.minimumQuantity || 5}L`}
+          </Text>
+        </View>
+        <View style={styles.serviceDetailItem}>
+          <Ionicons name="card-outline" size={14} color={colors.text.muted} />
+          <Text style={styles.serviceDetailText}>
+            {station.paymentMethods?.join(", ") || "Cash, UPI"}
+          </Text>
+        </View>
+      </View>
+
       <Button
         title="Order Fuel"
         icon="cart-outline"
@@ -970,6 +1275,7 @@ function ChargingTab({ token }) {
   const [longitude, setLongitude] = useState("77.5946");
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState("");
   const [connectorFilter, setConnectorFilter] = useState("");
+  const [searchRange, setSearchRange] = useState(15000);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -982,6 +1288,7 @@ function ChargingTab({ token }) {
   const [currentBatteryPercent, setCurrentBatteryPercent] = useState("20");
   const [targetBatteryPercent, setTargetBatteryPercent] = useState("80");
   const [address, setAddress] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("upi");
   const [showRequestModal, setShowRequestModal] = useState(false);
 
   const detectLocation = async () => {
@@ -1010,13 +1317,18 @@ function ChargingTab({ token }) {
       const res = await chargingStationAPI.getNearby(
         Number(longitude),
         Number(latitude),
-        15000,
+        searchRange,
         {
           vehicleType: vehicleTypeFilter || undefined,
           connectorType: connectorFilter || undefined,
         },
       );
       setList(res?.data || []);
+      if ((res?.data || []).length === 0) {
+        setError(
+          `No charging stations found within ${searchRange / 1000} km. Try increasing the search range.`,
+        );
+      }
     } catch (err) {
       setError(err.message || "Could not load charging stations");
     } finally {
@@ -1054,6 +1366,7 @@ function ChargingTab({ token }) {
         pricePerKwh: chargingType.pricePerKwh,
         serviceCharges: selectedProvider.serviceCharges || 0,
         address: address || "GPS Location",
+        paymentMethod,
         deliveryLocation: {
           type: "Point",
           coordinates: [Number(longitude), Number(latitude)],
@@ -1063,6 +1376,7 @@ function ChargingTab({ token }) {
       setSuccess("Charging request submitted! Track it in Requests tab.");
       setShowRequestModal(false);
       setSelectedProvider(null);
+      setPaymentMethod("upi");
     } catch (err) {
       setError(err.message || "Failed to create request");
     } finally {
@@ -1100,7 +1414,10 @@ function ChargingTab({ token }) {
 
         {/* GPS Detection Button */}
         <Pressable
-          style={[styles.gpsButton, locationLoading && styles.gpsButtonDisabled]}
+          style={[
+            styles.gpsButton,
+            locationLoading && styles.gpsButtonDisabled,
+          ]}
           onPress={locationLoading ? null : detectLocation}
         >
           <Ionicons
@@ -1181,6 +1498,24 @@ function ChargingTab({ token }) {
         ))}
       </ScrollView>
 
+      {/* Search Range */}
+      <Text style={styles.filterLabel}>Search Range</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
+      >
+        {RANGE_OPTIONS.map((range) => (
+          <FilterChip
+            key={range.value}
+            label={range.label}
+            icon="📍"
+            selected={searchRange === range.value}
+            onPress={() => setSearchRange(range.value)}
+          />
+        ))}
+      </ScrollView>
+
       {/* Search Button */}
       <Button
         title="Search Charging Stations"
@@ -1237,151 +1572,200 @@ function ChargingTab({ token }) {
               </Pressable>
             </View>
 
-            {selectedProvider && (
-              <View style={styles.selectedProviderInfo}>
-                <IconCircle
-                  icon="flash"
-                  color={colors.brand.emerald}
-                  size={44}
-                />
-                <View style={styles.selectedProviderText}>
-                  <Text style={styles.selectedProviderName}>
-                    {selectedProvider.stationName}
-                  </Text>
-                  <View style={styles.ratingRow}>
-                    <RatingStars
-                      rating={selectedProvider.rating || 0}
-                      size={14}
-                    />
-                    <Text style={styles.ratingText}>
-                      ({selectedProvider.totalRatings || 0})
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={[
+                styles.modalScrollContent,
+                styles.orderModalScrollContent,
+              ]}
+            >
+              {selectedProvider && (
+                <View style={styles.selectedProviderInfo}>
+                  <IconCircle
+                    icon="flash"
+                    color={colors.brand.emerald}
+                    size={44}
+                  />
+                  <View style={styles.selectedProviderText}>
+                    <Text style={styles.selectedProviderName}>
+                      {selectedProvider.stationName}
                     </Text>
+                    <View style={styles.ratingRow}>
+                      <RatingStars
+                        rating={selectedProvider.rating || 0}
+                        size={14}
+                      />
+                      <Text style={styles.ratingText}>
+                        ({selectedProvider.totalRatings || 0})
+                      </Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-            )}
+              )}
 
-            <Text style={styles.inputLabel}>Vehicle Type</Text>
-            <View style={styles.pickerWrap}>
-              <Picker
-                selectedValue={vehicleType}
-                onValueChange={setVehicleType}
-                style={styles.picker}
-                dropdownIconColor={colors.text.secondary}
-              >
-                {["2-wheeler", "3-wheeler", "4-wheeler", "commercial"].map(
-                  (v) => (
+              <Text style={styles.inputLabel}>Vehicle Type</Text>
+              <View style={styles.pickerWrap}>
+                <Picker
+                  selectedValue={vehicleType}
+                  onValueChange={setVehicleType}
+                  style={styles.picker}
+                  dropdownIconColor={colors.text.secondary}
+                  mode="dropdown"
+                >
+                  {["2-wheeler", "3-wheeler", "4-wheeler", "commercial"].map(
+                    (v) => (
+                      <Picker.Item
+                        key={v}
+                        label={v}
+                        value={v}
+                        style={styles.pickerItem}
+                      />
+                    ),
+                  )}
+                </Picker>
+              </View>
+
+              <Text style={styles.inputLabel}>Connector Type</Text>
+              <View style={styles.pickerWrap}>
+                <Picker
+                  selectedValue={connectorType}
+                  onValueChange={setConnectorType}
+                  style={styles.picker}
+                  dropdownIconColor={colors.text.secondary}
+                  mode="dropdown"
+                >
+                  {["Type2", "CCS2", "CHAdeMO", "GBT"].map((c) => (
                     <Picker.Item
-                      key={v}
-                      label={v}
-                      value={v}
-                      color={colors.text.primary}
+                      key={c}
+                      label={c}
+                      value={c}
+                      style={styles.pickerItem}
                     />
-                  ),
-                )}
-              </Picker>
-            </View>
+                  ))}
+                </Picker>
+              </View>
 
-            <Text style={styles.inputLabel}>Connector Type</Text>
-            <View style={styles.pickerWrap}>
-              <Picker
-                selectedValue={connectorType}
-                onValueChange={setConnectorType}
-                style={styles.picker}
-                dropdownIconColor={colors.text.secondary}
-              >
-                {["Type2", "CCS2", "CHAdeMO", "GBT"].map((c) => (
-                  <Picker.Item
-                    key={c}
-                    label={c}
-                    value={c}
-                    color={colors.text.primary}
+              <View style={styles.batteryInputs}>
+                <View style={styles.batteryInput}>
+                  <Text style={styles.inputLabel}>Current Battery %</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={currentBatteryPercent}
+                    onChangeText={setCurrentBatteryPercent}
+                    keyboardType="numeric"
+                    placeholderTextColor={colors.text.muted}
                   />
+                </View>
+                <View style={styles.batteryInput}>
+                  <Text style={styles.inputLabel}>Target Battery %</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={targetBatteryPercent}
+                    onChangeText={setTargetBatteryPercent}
+                    keyboardType="numeric"
+                    placeholderTextColor={colors.text.muted}
+                  />
+                </View>
+              </View>
+
+              {/* Battery Visual */}
+              <View style={styles.batteryVisual}>
+                <View style={styles.batteryIcon}>
+                  <View
+                    style={[
+                      styles.batteryFill,
+                      {
+                        width: `${currentBatteryPercent}%`,
+                        backgroundColor: colors.error,
+                      },
+                    ]}
+                  />
+                </View>
+                <Ionicons
+                  name="arrow-forward"
+                  size={20}
+                  color={colors.text.muted}
+                />
+                <View style={styles.batteryIcon}>
+                  <View
+                    style={[
+                      styles.batteryFill,
+                      {
+                        width: `${targetBatteryPercent}%`,
+                        backgroundColor: colors.success,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.inputLabel}>Address (optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Your location"
+                placeholderTextColor={colors.text.muted}
+              />
+              <Text style={styles.gpsHint}>
+                <Ionicons name="location" size={12} color={colors.text.muted} />{" "}
+                GPS location will be used if left empty
+              </Text>
+
+              {/* Payment Method Selection */}
+              <Text style={styles.inputLabel}>Payment Method</Text>
+              <View style={styles.paymentMethodsWrap}>
+                {PAYMENT_METHODS.map((method) => (
+                  <Pressable
+                    key={method.value}
+                    style={[
+                      styles.paymentMethodBtn,
+                      paymentMethod === method.value &&
+                        styles.paymentMethodBtnActive,
+                    ]}
+                    onPress={() => setPaymentMethod(method.value)}
+                  >
+                    <Ionicons
+                      name={method.icon}
+                      size={18}
+                      color={
+                        paymentMethod === method.value
+                          ? colors.text.inverse
+                          : colors.text.secondary
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.paymentMethodText,
+                        paymentMethod === method.value &&
+                          styles.paymentMethodTextActive,
+                      ]}
+                    >
+                      {method.label}
+                    </Text>
+                  </Pressable>
                 ))}
-              </Picker>
-            </View>
+              </View>
 
-            <View style={styles.batteryInputs}>
-              <View style={styles.batteryInput}>
-                <Text style={styles.inputLabel}>Current Battery %</Text>
-                <TextInput
-                  style={styles.input}
-                  value={currentBatteryPercent}
-                  onChangeText={setCurrentBatteryPercent}
-                  keyboardType="numeric"
-                  placeholderTextColor={colors.text.muted}
+              <ErrorMessage message={error} />
+
+              <View style={[styles.modalButtons, styles.orderModalButtons]}>
+                <Button
+                  title="Cancel"
+                  variant="secondary"
+                  onPress={() => setShowRequestModal(false)}
+                  style={styles.modalButton}
+                />
+                <Button
+                  title="Request Charging"
+                  icon="flash-outline"
+                  onPress={sendRequest}
+                  loading={loading}
+                  variant="emerald"
+                  style={styles.modalButton}
                 />
               </View>
-              <View style={styles.batteryInput}>
-                <Text style={styles.inputLabel}>Target Battery %</Text>
-                <TextInput
-                  style={styles.input}
-                  value={targetBatteryPercent}
-                  onChangeText={setTargetBatteryPercent}
-                  keyboardType="numeric"
-                  placeholderTextColor={colors.text.muted}
-                />
-              </View>
-            </View>
-
-            {/* Battery Visual */}
-            <View style={styles.batteryVisual}>
-              <View style={styles.batteryIcon}>
-                <View
-                  style={[
-                    styles.batteryFill,
-                    {
-                      width: `${currentBatteryPercent}%`,
-                      backgroundColor: colors.error,
-                    },
-                  ]}
-                />
-              </View>
-              <Ionicons
-                name="arrow-forward"
-                size={20}
-                color={colors.text.muted}
-              />
-              <View style={styles.batteryIcon}>
-                <View
-                  style={[
-                    styles.batteryFill,
-                    {
-                      width: `${targetBatteryPercent}%`,
-                      backgroundColor: colors.success,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-
-            <Text style={styles.inputLabel}>Address (optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={address}
-              onChangeText={setAddress}
-              placeholder="Your location"
-              placeholderTextColor={colors.text.muted}
-            />
-
-            <ErrorMessage message={error} />
-
-            <View style={styles.modalButtons}>
-              <Button
-                title="Cancel"
-                variant="secondary"
-                onPress={() => setShowRequestModal(false)}
-                style={styles.modalButton}
-              />
-              <Button
-                title="Request Charging"
-                icon="flash-outline"
-                onPress={sendRequest}
-                loading={loading}
-                variant="emerald"
-                style={styles.modalButton}
-              />
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1454,6 +1838,16 @@ function ChargingStationCard({ station, onRequest }) {
             <Text style={styles.chargingTypePrice}>₹{ct.pricePerKwh}/kWh</Text>
           </View>
         ))}
+      </View>
+
+      {/* Service Details */}
+      <View style={styles.serviceDetailsWrap}>
+        <View style={styles.serviceDetailItem}>
+          <Ionicons name="card-outline" size={14} color={colors.text.muted} />
+          <Text style={styles.serviceDetailText}>
+            {station.paymentMethods?.join(", ") || "Cash, UPI, Card"}
+          </Text>
+        </View>
       </View>
 
       <Button
@@ -2063,20 +2457,47 @@ function FeedbackTab({ token, userId }) {
 }
 
 // ============== PROFILE TAB ==============
-function ProfileTab({ token, user, onClose }) {
-  const [name, setName] = useState(user?.name || "");
-  const [phone, setPhone] = useState(user?.phone || "");
-  const [address, setAddress] = useState(user?.address || "");
+function ProfileTab({ token, user, onClose, bottomInset = 0 }) {
+  const [profile, setProfile] = useState(null);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // Load full profile on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      setLoadingProfile(true);
+      try {
+        const res = await userAPI.getProfile(token);
+        const p = res?.data || user;
+        setProfile(p);
+        setName(p?.name || "");
+        setPhone(p?.phone || "");
+        setAddress(p?.address || "");
+      } catch (err) {
+        // Fallback to user from auth
+        setProfile(user);
+        setName(user?.name || "");
+        setPhone(user?.phone || "");
+        setAddress(user?.address || "");
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+    loadProfile();
+  }, [token, user]);
 
   const updateProfile = async () => {
     setLoading(true);
     setError("");
     setSuccess("");
     try {
-      await userAPI.updateProfile(token, { name, phone, address });
+      const res = await userAPI.updateProfile(token, { name, phone, address });
+      setProfile(res?.data || { ...profile, name, phone, address });
       setSuccess("Profile updated successfully!");
     } catch (err) {
       setError(err.message || "Could not update profile");
@@ -2085,11 +2506,24 @@ function ProfileTab({ token, user, onClose }) {
     }
   };
 
+  if (loadingProfile) {
+    return (
+      <View style={{ padding: spacing.xl, alignItems: "center" }}>
+        <ActivityIndicator size="large" color={colors.brand.primary} />
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       style={styles.modalScrollBody}
-      contentContainerStyle={styles.bodyContent}
+      contentContainerStyle={[
+        styles.bodyContent,
+        { paddingBottom: 40 + bottomInset + spacing.lg },
+      ]}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      nestedScrollEnabled
     >
       {/* Profile Header */}
       <Card style={styles.profileHeaderCard}>
@@ -2098,16 +2532,14 @@ function ProfileTab({ token, user, onClose }) {
             <Ionicons name="person" size={40} color={colors.brand.primary} />
           </View>
           <View style={styles.profileHeaderInfo}>
-            <Text style={styles.profileName}>{user?.name || "User"}</Text>
-            <Text style={styles.profileEmail}>{user?.email || "No email"}</Text>
+            <Text style={styles.profileName}>{profile?.name || "User"}</Text>
+            <Text style={styles.profileEmail}>{profile?.email || "No email"}</Text>
             <View style={styles.profileRoleBadge}>
               <Text style={styles.profileRoleText}>User Account</Text>
             </View>
           </View>
         </View>
       </Card>
-
-      <SectionTitle>Edit Profile</SectionTitle>
 
       <Card>
         <Text style={styles.inputLabel}>Full Name</Text>
@@ -2158,21 +2590,31 @@ function ProfileTab({ token, user, onClose }) {
         <InfoRow
           icon="mail-outline"
           label="Email"
-          value={user?.email || "N/A"}
+          value={profile?.email || "N/A"}
+        />
+        <InfoRow
+          icon="call-outline"
+          label="Phone"
+          value={profile?.phone || "Not provided"}
+        />
+        <InfoRow
+          icon="location-outline"
+          label="Address"
+          value={profile?.address || "Not provided"}
         />
         <InfoRow
           icon="calendar-outline"
           label="Member Since"
           value={
-            user?.createdAt
-              ? new Date(user.createdAt).toLocaleDateString()
+            profile?.createdAt
+              ? new Date(profile.createdAt).toLocaleDateString()
               : "N/A"
           }
         />
         <InfoRow
           icon="checkmark-circle-outline"
           label="Verified"
-          value={user?.isVerified ? "Yes" : "No"}
+          value={profile?.isVerified ? "Yes" : "No"}
         />
       </Card>
     </ScrollView>
@@ -2191,14 +2633,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.bg.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.default,
   },
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
+    flex: 1,
+  },
+  headerTextWrap: {
+    flex: 1,
   },
   avatarCircle: {
     width: 44,
@@ -2214,27 +2666,14 @@ const styles = StyleSheet.create({
   },
   userName: {
     color: colors.text.primary,
-    fontSize: fontSize.xl,
+    fontSize: fontSize.lg,
     fontWeight: "700",
   },
-  logoutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    padding: spacing.sm,
-  },
-  logoutText: {
-    color: colors.error,
+  roleTitle: {
+    color: colors.text.secondary,
     fontSize: fontSize.sm,
-    fontWeight: "500",
+    marginTop: 2,
   },
-  profileLabel: {
-    color: colors.brand.primary,
-    fontSize: fontSize.xs,
-    fontWeight: "500",
-    marginBottom: 2,
-  },
-
   // Tabs
   tabScrollView: {
     maxHeight: 50,
@@ -2561,8 +3000,18 @@ const styles = StyleSheet.create({
     borderTopRightRadius: borderRadius.xl,
     padding: spacing.xl,
     maxHeight: "90%",
+    minHeight: 0,
+    overflow: "hidden",
+  },
+  modalScrollContent: {
+    paddingBottom: spacing.md,
+  },
+  orderModalScrollContent: {
+    paddingBottom: spacing.xxl,
   },
   modalScrollBody: {
+    flex: 1,
+    minHeight: 0,
     paddingHorizontal: spacing.md,
   },
   modalHeader: {
@@ -2570,6 +3019,42 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: spacing.lg,
+  },
+  profileModalHeader: {
+    paddingTop: spacing.sm,
+    marginBottom: spacing.md,
+    justifyContent: "flex-start",
+    gap: spacing.md,
+  },
+  profileModalLogoutAction: {
+    marginLeft: "auto",
+    paddingVertical: 2,
+    paddingHorizontal: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: `${colors.error}55`,
+  },
+  profileModalLogoutActionPressed: {
+    opacity: 0.65,
+  },
+  profileModalLogoutText: {
+    color: colors.error,
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  profileModalTitle: {
+    fontSize: fontSize.xl,
+  },
+  profileModalIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.bg.tertiary,
+    borderWidth: 1,
+    borderColor: colors.border.default,
   },
   modalTitle: {
     color: colors.text.primary,
@@ -2597,6 +3082,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.md,
     marginTop: spacing.xl,
+  },
+  orderModalButtons: {
+    marginBottom: spacing.md,
   },
   modalButton: {
     flex: 1,
@@ -2858,5 +3346,118 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginTop: spacing.xl,
+  },
+  // GPS Hint
+  gpsHint: {
+    color: colors.text.muted,
+    fontSize: fontSize.xs,
+    marginTop: 4,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  // Service Details for Cards
+  serviceDetailsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.default,
+  },
+  serviceDetailItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  serviceDetailText: {
+    color: colors.text.muted,
+    fontSize: fontSize.xs,
+  },
+
+  // Picker Item Style (for dark mode dropdown visibility)
+  pickerItem: {
+    backgroundColor: colors.bg.input,
+    color: colors.text.primary,
+  },
+
+  // Image Picker
+  imagePickerRow: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.sm,
+  },
+  imagePickerBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.bg.tertiary,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  imagePickerText: {
+    color: colors.text.secondary,
+    fontSize: fontSize.sm,
+    fontWeight: "500",
+  },
+  imagePreviewWrap: {
+    marginTop: spacing.md,
+    position: "relative",
+    alignSelf: "flex-start",
+  },
+  imagePreview: {
+    width: 120,
+    height: 120,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.bg.tertiary,
+  },
+  removeImageBtn: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    backgroundColor: colors.error,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Payment Method Selection
+  paymentMethodsWrap: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  paymentMethodBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.bg.tertiary,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  paymentMethodBtnActive: {
+    backgroundColor: colors.brand.primary,
+    borderColor: colors.brand.primary,
+  },
+  paymentMethodText: {
+    color: colors.text.secondary,
+    fontSize: fontSize.sm,
+    fontWeight: "500",
+  },
+  paymentMethodTextActive: {
+    color: colors.text.inverse,
   },
 });

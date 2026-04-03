@@ -60,6 +60,11 @@ export function Button({
       text: colors.brand.primary,
       borderColor: colors.brand.primary,
     },
+    outline: {
+      bg: "transparent",
+      text: colors.brand.primary,
+      borderColor: colors.brand.primary,
+    },
     success: {
       bg: colors.success,
       text: colors.text.primary,
@@ -80,13 +85,14 @@ export function Button({
 
   const sizeStyles = {
     sm: { paddingVertical: 8, paddingHorizontal: 12, fontSize: fontSize.sm },
+    small: { paddingVertical: 8, paddingHorizontal: 12, fontSize: fontSize.sm },
     md: { paddingVertical: 12, paddingHorizontal: 16, fontSize: fontSize.md },
     lg: { paddingVertical: 14, paddingHorizontal: 20, fontSize: fontSize.lg },
   };
 
   const { bg, text, borderColor } =
     buttonStyles[variant] || buttonStyles.primary;
-  const sizeStyle = sizeStyles[size];
+  const sizeStyle = sizeStyles[size] || sizeStyles.md;
   const isDisabled = disabled || loading;
 
   return (
@@ -249,10 +255,7 @@ export function RatingStars({ rating, size = 16, interactive, onRate }) {
   return (
     <View style={styles.ratingStars}>
       {stars.map((star) => (
-        <Pressable
-          key={star}
-          onPress={interactive ? () => onRate(star) : null}
-        >
+        <Pressable key={star} onPress={interactive ? () => onRate(star) : null}>
           <Ionicons
             name={star <= rating ? "star" : "star-outline"}
             size={size}

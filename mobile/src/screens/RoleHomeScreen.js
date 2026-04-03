@@ -10,18 +10,24 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
 import {
   adminAPI,
+  authAPI,
   chargingStationAPI,
   feedbackAPI,
   fuelStationAPI,
   mechanicAPI,
+  userAPI,
 } from "../services/api";
+import * as Location from "expo-location";
 import { colors, spacing, borderRadius, fontSize } from "../components/theme";
 import {
   Card,
@@ -59,6 +65,7 @@ const ADMIN_TABS = [
   { id: "overview", label: "Overview", icon: "grid-outline" },
   { id: "approvals", label: "Approvals", icon: "checkmark-circle-outline" },
   { id: "activeRequests", label: "Active", icon: "time-outline" },
+  { id: "feedback", label: "Feedback", icon: "chatbubbles-outline" },
 ];
 
 // Status workflow options
@@ -97,8 +104,14 @@ const CHARGING_STATUSES = [
 
 export default function RoleHomeScreen() {
   const { session, logout } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { height: viewportHeight } = useWindowDimensions();
   const role = session?.user?.role;
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const profileModalMaxHeight = Math.max(
+    420,
+    viewportHeight - insets.top - insets.bottom - spacing.xl,
+  );
 
   const roleTabs = useMemo(() => {
     if (role === "mechanic") return MECHANIC_TABS;
@@ -142,16 +155,12 @@ export default function RoleHomeScreen() {
               color={colors.brand.primary}
             />
           </View>
-          <View>
-            <Text style={styles.profileLabel}>Profile</Text>
+          <View style={styles.headerTextWrap}>
             <Text style={styles.userName}>
               {session?.user?.name || "Provider"}
             </Text>
+            <Text style={styles.roleTitle}>{getRoleTitle()}</Text>
           </View>
-        </Pressable>
-        <Pressable style={styles.logoutButton} onPress={logout}>
-          <Ionicons name="log-out-outline" size={22} color={colors.error} />
-          <Text style={styles.logoutText}>Logout</Text>
         </Pressable>
       </View>
 
@@ -212,20 +221,53 @@ export default function RoleHomeScreen() {
       )}
 
       {/* Profile Modal */}
-      <Modal visible={showProfileModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>My Profile</Text>
-              <Pressable onPress={() => setShowProfileModal(false)}>
-                <Ionicons name="close" size={24} color={colors.text.muted} />
+      <Modal
+        visible={showProfileModal}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+      >
+        <View
+          style={[
+            styles.modalOverlay,
+            {
+              paddingTop: insets.top + spacing.sm,
+              paddingBottom: insets.bottom + spacing.xs,
+            },
+          ]}
+        >
+          <View
+            style={[styles.modalContent, { height: profileModalMaxHeight }]}
+          >
+            <View style={[styles.modalHeader, styles.profileModalHeader]}>
+              <Pressable
+                style={styles.profileModalIconBtn}
+                onPress={() => setShowProfileModal(false)}
+              >
+                <Ionicons
+                  name="arrow-back"
+                  size={22}
+                  color={colors.text.secondary}
+                />
+              </Pressable>
+              <Text style={[styles.modalTitle, styles.profileModalTitle]}>
+                My Profile
+              </Text>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.profileModalLogoutAction,
+                  pressed && styles.profileModalLogoutActionPressed,
+                ]}
+                onPress={logout}
+              >
+                <Text style={styles.profileModalLogoutText}>Logout</Text>
               </Pressable>
             </View>
             <ProfileModalContent
               token={session?.token}
               user={session?.user}
               role={role}
-              onClose={() => setShowProfileModal(false)}
+              bottomInset={insets.bottom}
             />
           </View>
         </View>
@@ -2033,6 +2075,14 @@ function AdminPanel({ token, activeTab }) {
   const [pendingFuel, setPendingFuel] = useState([]);
   const [pendingCharging, setPendingCharging] = useState([]);
   const [activeRequests, setActiveRequests] = useState([]);
+  const [allFeedback, setAllFeedback] = useState([]);
+  const [feedbackFilter, setFeedbackFilter] = useState("all"); // "all", "Mechanic", "FuelStation"
+
+  // Platform users/providers list modal
+  const [showListModal, setShowListModal] = useState(false);
+  const [listType, setListType] = useState(""); // "users", "mechanics", "fuel", "charging"
+  const [listData, setListData] = useState([]);
+  const [listLoading, setListLoading] = useState(false);
 
   // Approval modal
   const [showApprovalModal, setShowApprovalModal] = useState(false);
@@ -2052,6 +2102,67 @@ function AdminPanel({ token, activeTab }) {
       setRefreshing(false);
     }
   }, [token]);
+
+  const loadFeedback = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await adminAPI.getFeedback(token);
+      setAllFeedback(res?.data || []);
+    } catch (err) {
+      setError(err.message || "Failed to load feedback");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [token]);
+
+  const openListModal = async (type) => {
+    setListType(type);
+    setShowListModal(true);
+    setListLoading(true);
+    setListData([]);
+    try {
+      let res;
+      if (type === "users") {
+        res = await adminAPI.getUsers(token);
+      } else if (type === "mechanics") {
+        res = await adminAPI.getAllMechanics(token);
+      } else if (type === "fuel") {
+        res = await adminAPI.getAllFuelStations(token);
+      } else if (type === "charging") {
+        res = await adminAPI.getAllChargingStations(token);
+      }
+      setListData(res?.data || []);
+    } catch (err) {
+      setError(err.message || "Failed to load data");
+    } finally {
+      setListLoading(false);
+    }
+  };
+
+  const revokeProvider = async (provider, type) => {
+    setListLoading(true);
+    setError("");
+    try {
+      if (type === "mechanics") {
+        await adminAPI.revokeMechanic(token, provider._id);
+      } else if (type === "fuel") {
+        await adminAPI.revokeFuelStation(token, provider._id);
+      } else if (type === "charging") {
+        await adminAPI.revokeChargingStation(token, provider._id);
+      }
+      setSuccess("Approval revoked successfully!");
+      setTimeout(() => setSuccess(""), 3000);
+      // Reload list
+      openListModal(type);
+      loadDashboard();
+    } catch (err) {
+      setError(err.message || "Failed to revoke approval");
+    } finally {
+      setListLoading(false);
+    }
+  };
 
   const loadApprovals = useCallback(async () => {
     setLoading(true);
@@ -2139,7 +2250,8 @@ function AdminPanel({ token, activeTab }) {
     if (activeTab === "overview") loadDashboard();
     if (activeTab === "approvals") loadApprovals();
     if (activeTab === "activeRequests") loadActiveRequests();
-  }, [activeTab, loadDashboard, loadApprovals, loadActiveRequests]);
+    if (activeTab === "feedback") loadFeedback();
+  }, [activeTab, loadDashboard, loadApprovals, loadActiveRequests, loadFeedback]);
 
   // Overview Tab
   if (activeTab === "overview") {
@@ -2165,48 +2277,170 @@ function AdminPanel({ token, activeTab }) {
           />
         )}
         <ErrorMessage message={error} />
+        <SuccessMessage message={success} />
 
         <SectionTitle>Platform Statistics</SectionTitle>
+        <Text style={styles.statHint}>Tap on a card to view all entries</Text>
 
         <View style={styles.statsGrid}>
-          <Card style={styles.statCard}>
-            <Ionicons
-              name="people-outline"
-              size={32}
-              color={colors.brand.primary}
-            />
-            <Text style={styles.statValue}>{dashboard?.users || 0}</Text>
-            <Text style={styles.statLabel}>Users</Text>
-          </Card>
+          <TouchableOpacity style={styles.statCardWrap} onPress={() => openListModal("users")}>
+            <Card style={styles.statCard}>
+              <Ionicons
+                name="people-outline"
+                size={32}
+                color={colors.brand.primary}
+              />
+              <Text style={styles.statValue}>{dashboard?.users || 0}</Text>
+              <Text style={styles.statLabel}>Users</Text>
+            </Card>
+          </TouchableOpacity>
 
-          <Card style={styles.statCard}>
-            <Ionicons
-              name="construct-outline"
-              size={32}
-              color={colors.brand.amber}
-            />
-            <Text style={styles.statValue}>{dashboard?.mechanics || 0}</Text>
-            <Text style={styles.statLabel}>Mechanics</Text>
-          </Card>
+          <TouchableOpacity style={styles.statCardWrap} onPress={() => openListModal("mechanics")}>
+            <Card style={styles.statCard}>
+              <Ionicons
+                name="construct-outline"
+                size={32}
+                color={colors.brand.amber}
+              />
+              <Text style={styles.statValue}>{dashboard?.mechanics || 0}</Text>
+              <Text style={styles.statLabel}>Mechanics</Text>
+            </Card>
+          </TouchableOpacity>
 
-          <Card style={styles.statCard}>
-            <Ionicons name="flame-outline" size={32} color={colors.error} />
-            <Text style={styles.statValue}>{dashboard?.fuelStations || 0}</Text>
-            <Text style={styles.statLabel}>Fuel Stations</Text>
-          </Card>
+          <TouchableOpacity style={styles.statCardWrap} onPress={() => openListModal("fuel")}>
+            <Card style={styles.statCard}>
+              <Ionicons name="flame-outline" size={32} color={colors.error} />
+              <Text style={styles.statValue}>{dashboard?.fuelStations || 0}</Text>
+              <Text style={styles.statLabel}>Fuel Stations</Text>
+            </Card>
+          </TouchableOpacity>
 
-          <Card style={styles.statCard}>
-            <Ionicons
-              name="flash-outline"
-              size={32}
-              color={colors.brand.emerald}
-            />
-            <Text style={styles.statValue}>
-              {dashboard?.chargingStations || 0}
-            </Text>
-            <Text style={styles.statLabel}>EV Stations</Text>
-          </Card>
+          <TouchableOpacity style={styles.statCardWrap} onPress={() => openListModal("charging")}>
+            <Card style={styles.statCard}>
+              <Ionicons
+                name="flash-outline"
+                size={32}
+                color={colors.brand.emerald}
+              />
+              <Text style={styles.statValue}>
+                {dashboard?.chargingStations || 0}
+              </Text>
+              <Text style={styles.statLabel}>EV Stations</Text>
+            </Card>
+          </TouchableOpacity>
         </View>
+
+        {/* Platform List Modal */}
+        <Modal visible={showListModal} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.listModalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {listType === "users"
+                    ? "All Users"
+                    : listType === "mechanics"
+                      ? "All Mechanics"
+                      : listType === "fuel"
+                        ? "All Fuel Stations"
+                        : "All EV Stations"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowListModal(false)}
+                  style={styles.closeBtn}
+                >
+                  <Ionicons name="close" size={24} color={colors.text.primary} />
+                </TouchableOpacity>
+              </View>
+
+              {listLoading ? (
+                <ActivityIndicator
+                  style={{ marginVertical: 40 }}
+                  color={colors.brand.primary}
+                />
+              ) : listData.length === 0 ? (
+                <Text style={styles.emptyText}>No data found</Text>
+              ) : (
+                <ScrollView 
+                  style={styles.listModalScrollView}
+                  contentContainerStyle={styles.listModalScrollContent}
+                  showsVerticalScrollIndicator={true}
+                >
+                  {listData.map((item) => {
+                    const isProvider = listType !== "users";
+                    const isApproved = item.isApproved;
+                    const name =
+                      listType === "users"
+                        ? item.name
+                        : listType === "mechanics"
+                          ? item.name
+                          : item.stationName;
+                    const subtitle =
+                      listType === "users"
+                        ? item.email
+                        : listType === "mechanics"
+                          ? item.mechanicType || "Mechanic"
+                          : listType === "fuel"
+                            ? "Fuel Station"
+                            : "EV Station";
+
+                    return (
+                      <Card key={item._id} style={styles.listItemCard}>
+                        <View style={styles.listItemRow}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.listItemName}>{name}</Text>
+                            <Text style={styles.listItemSubtitle}>{subtitle}</Text>
+                            {item.phone && (
+                              <Text style={styles.listItemInfo}>
+                                📞 {item.phone}
+                              </Text>
+                            )}
+                            {item.email && listType !== "users" && (
+                              <Text style={styles.listItemInfo}>
+                                ✉️ {item.email}
+                              </Text>
+                            )}
+                            {isProvider && (
+                              <View style={styles.statusRow}>
+                                <StatusBadge
+                                  status={isApproved ? "Approved" : "Pending"}
+                                  color={
+                                    isApproved
+                                      ? colors.brand.emerald
+                                      : colors.brand.amber
+                                  }
+                                />
+                                {item.availability !== undefined && (
+                                  <StatusBadge
+                                    status={
+                                      item.availability ? "Available" : "Unavailable"
+                                    }
+                                    color={
+                                      item.availability
+                                        ? colors.brand.primary
+                                        : colors.text.muted
+                                    }
+                                  />
+                                )}
+                              </View>
+                            )}
+                          </View>
+                          {isProvider && isApproved && (
+                            <TouchableOpacity
+                              style={styles.revokeBtn}
+                              onPress={() => revokeProvider(item, listType)}
+                            >
+                              <Text style={styles.revokeBtnText}>Revoke</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </Card>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </Modal>
 
         {/* Pending Approvals Summary */}
         <SectionTitle>Pending Approvals</SectionTitle>
@@ -2474,6 +2708,162 @@ function AdminPanel({ token, activeTab }) {
     );
   }
 
+  // Feedback Tab
+  if (activeTab === "feedback") {
+    const filteredFeedback = feedbackFilter === "all" 
+      ? allFeedback 
+      : allFeedback.filter(f => f.serviceType === feedbackFilter);
+
+    const mechanicCount = allFeedback.filter(f => f.serviceType === "Mechanic").length;
+    const fuelCount = allFeedback.filter(f => f.serviceType === "FuelStation").length;
+
+    return (
+      <View style={styles.body}>
+        {loading && (
+          <ActivityIndicator style={styles.loader} color={colors.brand.primary} />
+        )}
+        <ErrorMessage message={error} />
+
+        {/* Filter Chips */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.feedbackFilterScroll}
+          contentContainerStyle={styles.feedbackFilterContent}
+        >
+          <TouchableOpacity
+            style={[
+              styles.feedbackFilterChip,
+              feedbackFilter === "all" && styles.feedbackFilterChipActive,
+            ]}
+            onPress={() => setFeedbackFilter("all")}
+          >
+            <Text style={[
+              styles.feedbackFilterText,
+              feedbackFilter === "all" && styles.feedbackFilterTextActive,
+            ]}>
+              All ({allFeedback.length})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.feedbackFilterChip,
+              feedbackFilter === "Mechanic" && styles.feedbackFilterChipActive,
+            ]}
+            onPress={() => setFeedbackFilter("Mechanic")}
+          >
+            <Ionicons 
+              name="construct" 
+              size={14} 
+              color={feedbackFilter === "Mechanic" ? colors.text.inverse : colors.brand.amber} 
+            />
+            <Text style={[
+              styles.feedbackFilterText,
+              feedbackFilter === "Mechanic" && styles.feedbackFilterTextActive,
+            ]}>
+              Mechanics ({mechanicCount})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.feedbackFilterChip,
+              feedbackFilter === "FuelStation" && styles.feedbackFilterChipActive,
+            ]}
+            onPress={() => setFeedbackFilter("FuelStation")}
+          >
+            <Ionicons 
+              name="flame" 
+              size={14} 
+              color={feedbackFilter === "FuelStation" ? colors.text.inverse : colors.error} 
+            />
+            <Text style={[
+              styles.feedbackFilterText,
+              feedbackFilter === "FuelStation" && styles.feedbackFilterTextActive,
+            ]}>
+              Fuel ({fuelCount})
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        <FlatList
+          data={filteredFeedback}
+          keyExtractor={(item) => item._id}
+          contentContainerStyle={styles.listPad}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadFeedback();
+              }}
+              tintColor={colors.brand.primary}
+            />
+          }
+          ListEmptyComponent={
+            !loading && (
+              <EmptyState
+                icon="chatbubbles-outline"
+                title="No Feedback Yet"
+                subtitle="User feedback will appear here"
+              />
+            )
+          }
+          renderItem={({ item }) => {
+            const getIcon = () => {
+              if (item.serviceType === "Mechanic") return "construct";
+              if (item.serviceType === "FuelStation") return "flame";
+              return "flash";
+            };
+            const getColor = () => {
+              if (item.serviceType === "Mechanic") return colors.brand.amber;
+              if (item.serviceType === "FuelStation") return colors.error;
+              return colors.brand.emerald;
+            };
+            const getProviderName = () => {
+              // serviceProvider is populated with name or stationName
+              return item.serviceProvider?.name || item.serviceProvider?.stationName || 
+                (item.serviceType === "Mechanic" ? "Mechanic" : "Fuel Station");
+            };
+
+            return (
+              <Card style={styles.feedbackCard}>
+                <View style={styles.feedbackHeader}>
+                  <IconCircle icon={getIcon()} size={40} color={getColor()} />
+                  <View style={styles.feedbackHeaderInfo}>
+                    <Text style={styles.feedbackProviderName}>{getProviderName()}</Text>
+                    <Text style={styles.feedbackType}>
+                      {item.serviceType === "Mechanic" ? "Mechanic" : "Fuel Station"}
+                    </Text>
+                  </View>
+                  <View style={styles.feedbackRating}>
+                    <Ionicons name="star" size={16} color={colors.brand.amber} />
+                    <Text style={styles.feedbackRatingText}>{item.rating || 0}</Text>
+                  </View>
+                </View>
+
+                {item.comment && (
+                  <Text style={styles.feedbackComment}>"{item.comment}"</Text>
+                )}
+
+                <View style={styles.feedbackFooter}>
+                  <View style={styles.feedbackUserInfo}>
+                    <Ionicons name="person-outline" size={14} color={colors.text.muted} />
+                    <Text style={styles.feedbackUserName}>{item.user?.name || "User"}</Text>
+                  </View>
+                  <Text style={styles.feedbackDate}>
+                    {new Date(item.createdAt).toLocaleDateString()}
+                  </Text>
+                </View>
+              </Card>
+            );
+          }}
+        />
+      </View>
+    );
+  }
+
   // Active Requests Tab
   return (
     <View style={styles.body}>
@@ -2568,78 +2958,248 @@ function AdminPanel({ token, activeTab }) {
 }
 
 // ============== PROFILE MODAL CONTENT ==============
-function ProfileModalContent({ token, user, role, onClose }) {
+function ProfileModalContent({ token, user, role, bottomInset = 0 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [editing, setEditing] = useState(false);
   const [profile, setProfile] = useState(null);
 
+  // Shared fields
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
+
+  // Mechanic fields
+  const [mechanicType, setMechanicType] = useState("car");
+  const [servicesOffered, setServicesOffered] = useState("");
+  const [experience, setExperience] = useState("");
+  const [mechanicAvailable, setMechanicAvailable] = useState(true);
+  const [serviceRadius, setServiceRadius] = useState("");
+
+  // Station fields
   const [stationName, setStationName] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+  const [openingHours, setOpeningHours] = useState("");
+
+  // Fuel station fields
+  const [deliveryAvailable, setDeliveryAvailable] = useState(true);
+  const [deliveryRadius, setDeliveryRadius] = useState("");
+  const [deliveryCharges, setDeliveryCharges] = useState("");
+  const [minimumOrderQuantity, setMinimumOrderQuantity] = useState("");
+
+  // Charging station fields
+  const [mobileChargingAvailable, setMobileChargingAvailable] = useState(true);
+  const [serviceCharges, setServiceCharges] = useState("");
+  const [estimatedResponseTime, setEstimatedResponseTime] = useState("");
+
+  const setProfileFields = useCallback((nextProfile) => {
+    const coords = nextProfile?.location?.coordinates || [];
+
+    setName(nextProfile?.name || nextProfile?.ownerName || "");
+    setPhone(nextProfile?.phone || "");
+    setAddress(nextProfile?.address || "");
+    setLatitude(coords[1] !== undefined ? String(coords[1]) : "");
+    setLongitude(coords[0] !== undefined ? String(coords[0]) : "");
+
+    setMechanicType(nextProfile?.mechanicType || "car");
+    setServicesOffered(
+      Array.isArray(nextProfile?.servicesOffered)
+        ? nextProfile.servicesOffered.join(", ")
+        : "",
+    );
+    setExperience(
+      nextProfile?.experience !== undefined
+        ? String(nextProfile.experience)
+        : "",
+    );
+    setMechanicAvailable(nextProfile?.availability !== false);
+    setServiceRadius(
+      nextProfile?.serviceRadius !== undefined
+        ? String(nextProfile.serviceRadius)
+        : "",
+    );
+
+    setStationName(nextProfile?.stationName || "");
+    setOwnerName(nextProfile?.ownerName || "");
+    setOpeningHours(nextProfile?.openingHours || "");
+
+    setDeliveryAvailable(nextProfile?.deliveryAvailable !== false);
+    setDeliveryRadius(
+      nextProfile?.deliveryRadius !== undefined
+        ? String(nextProfile.deliveryRadius)
+        : "",
+    );
+    setDeliveryCharges(
+      nextProfile?.deliveryCharges !== undefined
+        ? String(nextProfile.deliveryCharges)
+        : "",
+    );
+    setMinimumOrderQuantity(
+      nextProfile?.minimumOrderQuantity !== undefined
+        ? String(nextProfile.minimumOrderQuantity)
+        : "",
+    );
+
+    setMobileChargingAvailable(nextProfile?.mobileChargingAvailable !== false);
+    setServiceCharges(
+      nextProfile?.serviceCharges !== undefined
+        ? String(nextProfile.serviceCharges)
+        : "",
+    );
+    setEstimatedResponseTime(
+      nextProfile?.estimatedResponseTime !== undefined
+        ? String(nextProfile.estimatedResponseTime)
+        : "",
+    );
+  }, []);
 
   const loadProfile = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     setError("");
     try {
-      let res;
-      if (role === "mechanic") {
-        res = await mechanicAPI.getProfile(token);
-      } else if (role === "fuelStation") {
-        res = await fuelStationAPI.getProfile(token);
-      } else if (role === "chargingStation") {
-        res = await chargingStationAPI.getProfile(token);
-      } else if (role === "admin") {
-        // Admin doesn't have profile update, just show basic info
-        setProfile(user);
-        setName(user?.name || "");
-        setEmail(user?.email || "");
-        return;
+      let nextProfile = null;
+
+      try {
+        if (role === "mechanic") {
+          nextProfile = (await mechanicAPI.getMe(token))?.data || null;
+        } else if (role === "fuelStation") {
+          nextProfile = (await fuelStationAPI.getMe(token))?.data || null;
+        } else if (role === "chargingStation") {
+          nextProfile = (await chargingStationAPI.getMe(token))?.data || null;
+        } else if (role === "admin") {
+          nextProfile = (await userAPI.getMe(token))?.data || null;
+        }
+      } catch {
+        nextProfile = null;
       }
 
-      const p = res?.data || user;
-      setProfile(p);
-      setName(p?.name || "");
-      setPhone(p?.phone || "");
-      setEmail(p?.email || "");
-      setAddress(p?.address || "");
-      setStationName(p?.stationName || "");
+      if (!nextProfile) {
+        const me = await authAPI.getMe(token);
+        nextProfile = me?.user || null;
+      }
+
+      if (!nextProfile) {
+        throw new Error("Could not load profile. Please try again.");
+      }
+
+      setProfile(nextProfile);
+      setProfileFields(nextProfile);
     } catch (err) {
-      setError("Could not load profile");
+      setError(err.message || "Could not load profile. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [token, role, user]);
+  }, [token, role, user, setProfileFields]);
 
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
+
+  const detectLocation = async () => {
+    setError("");
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setError("Location permission denied");
+        return;
+      }
+      const current = await Location.getCurrentPositionAsync({});
+      setLatitude(String(current.coords.latitude.toFixed(6)));
+      setLongitude(String(current.coords.longitude.toFixed(6)));
+    } catch {
+      setError("Could not detect location");
+    }
+  };
+
+  const buildLocationPayload = () => {
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      return null;
+    }
+
+    return {
+      type: "Point",
+      coordinates: [lng, lat],
+    };
+  };
 
   const handleUpdate = async () => {
     setLoading(true);
     setError("");
     setSuccess("");
     try {
-      const updateData = { name, phone, address };
-      if (role === "fuelStation" || role === "chargingStation") {
-        updateData.stationName = stationName;
+      let updateData = {};
+
+      if (role === "admin") {
+        updateData = { name, phone, address };
+        await userAPI.updateProfile(token, updateData);
+      } else if (role === "mechanic") {
+        const parsedServices = servicesOffered
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+        if (parsedServices.length === 0) {
+          throw new Error("Please add at least one service offered.");
+        }
+
+        updateData = {
+          name,
+          phone,
+          address,
+          mechanicType: mechanicType || "car",
+          servicesOffered: parsedServices,
+          experience: Number(experience) || 0,
+          availability: mechanicAvailable,
+          serviceRadius: Number(serviceRadius) || 10,
+        };
+      } else if (role === "fuelStation") {
+        updateData = {
+          stationName,
+          ownerName,
+          phone,
+          address,
+          openingHours,
+          deliveryAvailable,
+          deliveryRadius: Number(deliveryRadius) || 5,
+          deliveryCharges: Number(deliveryCharges) || 0,
+          minimumOrderQuantity: Number(minimumOrderQuantity) || 5,
+        };
+      } else if (role === "chargingStation") {
+        updateData = {
+          stationName,
+          ownerName,
+          phone,
+          address,
+          openingHours,
+          mobileChargingAvailable,
+          serviceRadius: Number(serviceRadius) || 25,
+          serviceCharges: Number(serviceCharges) || 150,
+          estimatedResponseTime: Number(estimatedResponseTime) || 30,
+        };
+      }
+
+      const location = buildLocationPayload();
+      if (location) {
+        updateData.location = location;
       }
 
       if (role === "mechanic") {
-        await mechanicAPI.updateProfile(token, updateData);
-      } else if (role === "fuelStation") {
-        await fuelStationAPI.updateProfile(token, updateData);
-      } else if (role === "chargingStation") {
-        await chargingStationAPI.updateProfile(token, updateData);
+        await mechanicAPI.updateMe(token, updateData);
+      }
+      if (role === "fuelStation") {
+        await fuelStationAPI.updateMe(token, updateData);
+      }
+      if (role === "chargingStation") {
+        await chargingStationAPI.updateMe(token, updateData);
       }
 
-      setSuccess("Profile updated!");
-      setEditing(false);
-      loadProfile();
+      setSuccess("Profile updated successfully!");
+      await loadProfile();
     } catch (err) {
       setError(err.message || "Failed to update profile");
     } finally {
@@ -2655,124 +3215,500 @@ function ProfileModalContent({ token, user, role, onClose }) {
     );
   }
 
+  const getRoleLabel = () => {
+    if (role === "mechanic") return "Mechanic";
+    if (role === "fuelStation") return "Fuel Station";
+    if (role === "chargingStation") return "EV Charging Station";
+    return "Admin";
+  };
+
   return (
     <ScrollView
       style={modalStyles.scrollContent}
       showsVerticalScrollIndicator={false}
+      contentContainerStyle={{
+        paddingBottom: spacing.xl + bottomInset + spacing.md,
+      }}
+      keyboardShouldPersistTaps="handled"
+      nestedScrollEnabled
     >
       {error ? <ErrorMessage message={error} /> : null}
-      {success ? <SuccessMessage message={success} /> : null}
 
-      {/* Avatar */}
+      {/* Avatar Section */}
       <View style={modalStyles.avatarSection}>
         <View style={modalStyles.avatar}>
-          <Ionicons name="person" size={40} color={colors.brand.primary} />
+          <Ionicons
+            name={
+              role === "mechanic"
+                ? "construct"
+                : role === "fuelStation"
+                  ? "flame"
+                  : role === "chargingStation"
+                    ? "flash"
+                    : "person"
+            }
+            size={40}
+            color={colors.brand.primary}
+          />
         </View>
-        <Text style={modalStyles.roleLabel}>
-          {role?.charAt(0).toUpperCase() + role?.slice(1) || "User"}
+        <Text style={modalStyles.roleLabel}>{getRoleLabel()}</Text>
+        <Text style={modalStyles.emailLabel}>
+          {profile?.email || user?.email}
         </Text>
       </View>
 
-      {editing ? (
+      {/* Admin just shows info */}
+      {role === "admin" ? (
         <>
-          <Text style={modalStyles.inputLabel}>Name</Text>
-          <TextInput
-            style={modalStyles.input}
-            value={name}
-            onChangeText={setName}
-            placeholderTextColor={colors.text.muted}
+          <Text style={modalStyles.sectionTitle}>Basic Information</Text>
+          <Card>
+            <Text style={modalStyles.inputLabel}>Name</Text>
+            <TextInput
+              style={modalStyles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Your name"
+              placeholderTextColor={colors.text.muted}
+            />
+
+            <Text style={modalStyles.inputLabel}>Phone</Text>
+            <TextInput
+              style={modalStyles.input}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="Phone number"
+              keyboardType="phone-pad"
+              placeholderTextColor={colors.text.muted}
+            />
+
+            <Text style={modalStyles.inputLabel}>Address</Text>
+            <TextInput
+              style={modalStyles.input}
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Your address"
+              placeholderTextColor={colors.text.muted}
+            />
+          </Card>
+
+          <Text style={modalStyles.sectionTitle}>Account Information</Text>
+          <Card>
+            <InfoRow
+              icon="mail-outline"
+              label="Email"
+              value={profile?.email || "N/A"}
+            />
+            <InfoRow
+              icon="shield-checkmark-outline"
+              label="Role"
+              value="Administrator"
+            />
+            <InfoRow
+              icon="calendar-outline"
+              label="Member Since"
+              value={
+                profile?.createdAt
+                  ? new Date(profile.createdAt).toLocaleDateString()
+                  : "N/A"
+              }
+            />
+          </Card>
+
+          {success ? <SuccessMessage message={success} /> : null}
+          <Button
+            title="Save Changes"
+            icon="save-outline"
+            onPress={handleUpdate}
+            loading={loading}
+            style={{ marginTop: spacing.lg }}
           />
-
-          {role !== "admin" && (
-            <>
-              <Text style={modalStyles.inputLabel}>Phone</Text>
-              <TextInput
-                style={modalStyles.input}
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                placeholderTextColor={colors.text.muted}
-              />
-
-              <Text style={modalStyles.inputLabel}>Address</Text>
-              <TextInput
-                style={modalStyles.input}
-                value={address}
-                onChangeText={setAddress}
-                placeholderTextColor={colors.text.muted}
-              />
-            </>
-          )}
-
-          {(role === "fuelStation" || role === "chargingStation") && (
-            <>
-              <Text style={modalStyles.inputLabel}>Station Name</Text>
-              <TextInput
-                style={modalStyles.input}
-                value={stationName}
-                onChangeText={setStationName}
-                placeholderTextColor={colors.text.muted}
-              />
-            </>
-          )}
-
-          <View style={modalStyles.buttonRow}>
-            <Button
-              title="Cancel"
-              variant="outline"
-              onPress={() => setEditing(false)}
-              style={{ flex: 1 }}
-            />
-            <Button
-              title="Save"
-              onPress={handleUpdate}
-              loading={loading}
-              style={{ flex: 1 }}
-            />
-          </View>
         </>
       ) : (
         <>
-          <InfoRow
-            icon="person-outline"
-            label="Name"
-            value={profile?.name || user?.name || "N/A"}
-          />
-          <InfoRow
-            icon="mail-outline"
-            label="Email"
-            value={profile?.email || user?.email || "N/A"}
-          />
-          {role !== "admin" && (
-            <>
-              <InfoRow
-                icon="call-outline"
-                label="Phone"
-                value={profile?.phone || "Not set"}
-              />
-              <InfoRow
-                icon="location-outline"
-                label="Address"
-                value={profile?.address || "Not set"}
-              />
-            </>
-          )}
-          {(role === "fuelStation" || role === "chargingStation") && (
-            <InfoRow
-              icon="business-outline"
-              label="Station"
-              value={profile?.stationName || "Not set"}
-            />
-          )}
+          {/* Basic Info Section */}
+          <Text style={modalStyles.sectionTitle}>Basic Information</Text>
+          <Card>
+            {role === "mechanic" ? (
+              <>
+                <Text style={modalStyles.inputLabel}>Name</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Your name"
+                  placeholderTextColor={colors.text.muted}
+                />
 
-          {role !== "admin" && (
-            <Button
-              title="Edit Profile"
-              icon="create-outline"
-              onPress={() => setEditing(true)}
-              style={{ marginTop: spacing.lg }}
+                <Text style={modalStyles.inputLabel}>Phone</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="Phone number"
+                  keyboardType="phone-pad"
+                  placeholderTextColor={colors.text.muted}
+                />
+
+                <Text style={modalStyles.inputLabel}>Address</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholder="Your address"
+                  placeholderTextColor={colors.text.muted}
+                />
+              </>
+            ) : (
+              <>
+                <Text style={modalStyles.inputLabel}>Station Name</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={stationName}
+                  onChangeText={setStationName}
+                  placeholder="Station name"
+                  placeholderTextColor={colors.text.muted}
+                />
+
+                <Text style={modalStyles.inputLabel}>Owner Name</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={ownerName}
+                  onChangeText={setOwnerName}
+                  placeholder="Owner name"
+                  placeholderTextColor={colors.text.muted}
+                />
+
+                <Text style={modalStyles.inputLabel}>Phone</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="Phone number"
+                  keyboardType="phone-pad"
+                  placeholderTextColor={colors.text.muted}
+                />
+
+                <Text style={modalStyles.inputLabel}>Opening Hours</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={openingHours}
+                  onChangeText={setOpeningHours}
+                  placeholder="6:00 AM - 10:00 PM"
+                  placeholderTextColor={colors.text.muted}
+                />
+
+                <Text style={modalStyles.inputLabel}>Address</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholder="Station address"
+                  placeholderTextColor={colors.text.muted}
+                />
+              </>
+            )}
+          </Card>
+
+          {/* Service Settings */}
+          <Text style={modalStyles.sectionTitle}>Service Settings</Text>
+          <Card>
+            {role === "mechanic" && (
+              <>
+                <Text style={modalStyles.inputLabel}>Mechanic Type</Text>
+                <View style={modalStyles.pickerWrap}>
+                  <Picker
+                    selectedValue={mechanicType}
+                    onValueChange={setMechanicType}
+                    style={modalStyles.picker}
+                    dropdownIconColor={colors.text.secondary}
+                    mode="dropdown"
+                  >
+                    <Picker.Item label="Car" value="car" />
+                    <Picker.Item label="Bus/Truck" value="bus_truck" />
+                    <Picker.Item label="Bike" value="bike" />
+                  </Picker>
+                </View>
+
+                <Text style={modalStyles.inputLabel}>Experience (years)</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={experience}
+                  onChangeText={setExperience}
+                  placeholder="0"
+                  keyboardType="numeric"
+                  placeholderTextColor={colors.text.muted}
+                />
+
+                <Text style={modalStyles.inputLabel}>Service Radius (km)</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={serviceRadius}
+                  onChangeText={setServiceRadius}
+                  placeholder="10"
+                  keyboardType="numeric"
+                  placeholderTextColor={colors.text.muted}
+                />
+
+                <Text style={modalStyles.inputLabel}>
+                  Services Offered (comma separated)
+                </Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={servicesOffered}
+                  onChangeText={setServicesOffered}
+                  placeholder="Flat Tyre, Engine Repair"
+                  placeholderTextColor={colors.text.muted}
+                />
+
+                <View style={modalStyles.toggleRow}>
+                  <Text style={modalStyles.toggleLabel}>
+                    Available for Service
+                  </Text>
+                  <Pressable
+                    style={[
+                      modalStyles.toggleBtn,
+                      mechanicAvailable && modalStyles.toggleBtnActive,
+                    ]}
+                    onPress={() => setMechanicAvailable(!mechanicAvailable)}
+                  >
+                    <Ionicons
+                      name={
+                        mechanicAvailable ? "checkmark-circle" : "close-circle"
+                      }
+                      size={20}
+                      color={mechanicAvailable ? colors.success : colors.error}
+                    />
+                    <Text
+                      style={[
+                        modalStyles.toggleText,
+                        {
+                          color: mechanicAvailable
+                            ? colors.success
+                            : colors.error,
+                        },
+                      ]}
+                    >
+                      {mechanicAvailable ? "Available" : "Unavailable"}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+
+            {role === "fuelStation" && (
+              <>
+                <Text style={modalStyles.inputLabel}>Delivery Radius (km)</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={deliveryRadius}
+                  onChangeText={setDeliveryRadius}
+                  placeholder="5"
+                  keyboardType="numeric"
+                  placeholderTextColor={colors.text.muted}
+                />
+
+                <Text style={modalStyles.inputLabel}>Delivery Charges (₹)</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={deliveryCharges}
+                  onChangeText={setDeliveryCharges}
+                  placeholder="0"
+                  keyboardType="numeric"
+                  placeholderTextColor={colors.text.muted}
+                />
+
+                <Text style={modalStyles.inputLabel}>Minimum Order (L)</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={minimumOrderQuantity}
+                  onChangeText={setMinimumOrderQuantity}
+                  placeholder="5"
+                  keyboardType="numeric"
+                  placeholderTextColor={colors.text.muted}
+                />
+
+                <View style={modalStyles.toggleRow}>
+                  <Text style={modalStyles.toggleLabel}>
+                    Delivery Available
+                  </Text>
+                  <Pressable
+                    style={[
+                      modalStyles.toggleBtn,
+                      deliveryAvailable && modalStyles.toggleBtnActive,
+                    ]}
+                    onPress={() => setDeliveryAvailable(!deliveryAvailable)}
+                  >
+                    <Ionicons
+                      name={
+                        deliveryAvailable ? "checkmark-circle" : "close-circle"
+                      }
+                      size={20}
+                      color={deliveryAvailable ? colors.success : colors.error}
+                    />
+                    <Text
+                      style={[
+                        modalStyles.toggleText,
+                        {
+                          color: deliveryAvailable
+                            ? colors.success
+                            : colors.error,
+                        },
+                      ]}
+                    >
+                      {deliveryAvailable ? "Yes" : "No"}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+
+            {role === "chargingStation" && (
+              <>
+                <Text style={modalStyles.inputLabel}>Service Radius (km)</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={serviceRadius}
+                  onChangeText={setServiceRadius}
+                  placeholder="25"
+                  keyboardType="numeric"
+                  placeholderTextColor={colors.text.muted}
+                />
+
+                <Text style={modalStyles.inputLabel}>Service Charges (₹)</Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={serviceCharges}
+                  onChangeText={setServiceCharges}
+                  placeholder="0"
+                  keyboardType="numeric"
+                  placeholderTextColor={colors.text.muted}
+                />
+
+                <Text style={modalStyles.inputLabel}>
+                  Estimated Response Time (min)
+                </Text>
+                <TextInput
+                  style={modalStyles.input}
+                  value={estimatedResponseTime}
+                  onChangeText={setEstimatedResponseTime}
+                  placeholder="30"
+                  keyboardType="numeric"
+                  placeholderTextColor={colors.text.muted}
+                />
+
+                <View style={modalStyles.toggleRow}>
+                  <Text style={modalStyles.toggleLabel}>Mobile Charging</Text>
+                  <Pressable
+                    style={[
+                      modalStyles.toggleBtn,
+                      mobileChargingAvailable && modalStyles.toggleBtnActive,
+                    ]}
+                    onPress={() =>
+                      setMobileChargingAvailable(!mobileChargingAvailable)
+                    }
+                  >
+                    <Ionicons
+                      name={
+                        mobileChargingAvailable
+                          ? "checkmark-circle"
+                          : "close-circle"
+                      }
+                      size={20}
+                      color={
+                        mobileChargingAvailable ? colors.success : colors.error
+                      }
+                    />
+                    <Text
+                      style={[
+                        modalStyles.toggleText,
+                        {
+                          color: mobileChargingAvailable
+                            ? colors.success
+                            : colors.error,
+                        },
+                      ]}
+                    >
+                      {mobileChargingAvailable ? "Enabled" : "Disabled"}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+          </Card>
+
+          <Text style={modalStyles.sectionTitle}>Location</Text>
+          <Card>
+            <Text style={modalStyles.inputLabel}>Latitude</Text>
+            <TextInput
+              style={modalStyles.input}
+              value={latitude}
+              onChangeText={setLatitude}
+              placeholder="12.9716"
+              keyboardType="numeric"
+              placeholderTextColor={colors.text.muted}
             />
-          )}
+
+            <Text style={modalStyles.inputLabel}>Longitude</Text>
+            <TextInput
+              style={modalStyles.input}
+              value={longitude}
+              onChangeText={setLongitude}
+              placeholder="77.5946"
+              keyboardType="numeric"
+              placeholderTextColor={colors.text.muted}
+            />
+
+            <Pressable
+              style={modalStyles.detectLocationButton}
+              onPress={detectLocation}
+            >
+              <Ionicons
+                name="navigate-outline"
+                size={16}
+                color={colors.brand.primary}
+              />
+              <Text style={modalStyles.detectLocationText}>Auto Detect</Text>
+            </Pressable>
+          </Card>
+
+          {/* Account Info */}
+          <Text style={modalStyles.sectionTitle}>Account Information</Text>
+          <Card>
+            <InfoRow
+              icon="mail-outline"
+              label="Email"
+              value={profile?.email || "N/A"}
+            />
+            <InfoRow
+              icon="calendar-outline"
+              label="Member Since"
+              value={
+                profile?.createdAt
+                  ? new Date(profile.createdAt).toLocaleDateString()
+                  : "N/A"
+              }
+            />
+            <InfoRow
+              icon="checkmark-circle-outline"
+              label="Approved"
+              value={profile?.isApproved ? "Yes" : "Pending"}
+            />
+            <InfoRow
+              icon="star-outline"
+              label="Rating"
+              value={`${(profile?.rating || 0).toFixed(1)} (${profile?.totalRatings || 0} reviews)`}
+            />
+          </Card>
+
+          {/* Save Button */}
+          {success ? <SuccessMessage message={success} /> : null}
+          <Button
+            title="Save Changes"
+            icon="save-outline"
+            onPress={handleUpdate}
+            loading={loading}
+            style={{ marginTop: spacing.lg }}
+          />
         </>
       )}
     </ScrollView>
@@ -2786,6 +3722,8 @@ const modalStyles = StyleSheet.create({
     justifyContent: "center",
   },
   scrollContent: {
+    flex: 1,
+    minHeight: 0,
     padding: spacing.md,
   },
   avatarSection: {
@@ -2803,8 +3741,22 @@ const modalStyles = StyleSheet.create({
   },
   roleLabel: {
     color: colors.brand.primary,
+    fontSize: fontSize.md,
+    fontWeight: "600",
+  },
+  emailLabel: {
+    color: colors.text.muted,
+    fontSize: fontSize.sm,
+    marginTop: 4,
+  },
+  sectionTitle: {
+    color: colors.text.secondary,
     fontSize: fontSize.sm,
     fontWeight: "600",
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   inputLabel: {
     color: colors.text.secondary,
@@ -2823,10 +3775,63 @@ const modalStyles = StyleSheet.create({
     color: colors.text.primary,
     fontSize: fontSize.md,
   },
-  buttonRow: {
+  pickerWrap: {
+    backgroundColor: colors.bg.input,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    borderRadius: borderRadius.md,
+    overflow: "hidden",
+  },
+  picker: {
+    color: colors.text.primary,
+    backgroundColor: "transparent",
+  },
+  toggleRow: {
     flexDirection: "row",
-    gap: spacing.md,
+    justifyContent: "space-between",
+    alignItems: "center",
     marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.default,
+  },
+  toggleLabel: {
+    color: colors.text.secondary,
+    fontSize: fontSize.sm,
+    fontWeight: "500",
+  },
+  toggleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.bg.tertiary,
+  },
+  toggleBtnActive: {
+    backgroundColor: "rgba(16, 185, 129, 0.1)",
+  },
+  toggleText: {
+    fontSize: fontSize.sm,
+    fontWeight: "600",
+  },
+  detectLocationButton: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: `${colors.brand.primary}15`,
+    borderWidth: 1,
+    borderColor: `${colors.brand.primary}30`,
+    borderRadius: borderRadius.md,
+    paddingVertical: 10,
+  },
+  detectLocationText: {
+    color: colors.brand.primary,
+    fontSize: fontSize.sm,
+    fontWeight: "600",
   },
 });
 
@@ -2842,14 +3847,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.bg.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.default,
   },
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
+    flex: 1,
+  },
+  headerTextWrap: {
+    flex: 1,
   },
   avatarCircle: {
     width: 44,
@@ -2859,33 +3874,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  profileLabel: {
-    color: colors.brand.primary,
-    fontSize: fontSize.xs,
-    fontWeight: "500",
-    marginBottom: 2,
-  },
   roleTitle: {
     color: colors.text.secondary,
     fontSize: fontSize.sm,
+    marginTop: 2,
   },
   userName: {
     color: colors.text.primary,
     fontSize: fontSize.lg,
     fontWeight: "700",
   },
-  logoutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    padding: spacing.sm,
-  },
-  logoutText: {
-    color: colors.error,
-    fontSize: fontSize.sm,
-    fontWeight: "500",
-  },
-
   // Tabs
   tabScrollView: {
     maxHeight: 50,
@@ -3114,12 +4112,66 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
     padding: spacing.xl,
+    maxHeight: "92%",
+    minHeight: 0,
+    overflow: "hidden",
+  },
+  listModalContent: {
+    backgroundColor: colors.bg.secondary,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    paddingTop: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    maxHeight: "85%",
+    flex: 1,
+  },
+  listModalScrollView: {
+    flex: 1,
+  },
+  listModalScrollContent: {
+    paddingBottom: spacing.xl,
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: spacing.lg,
+  },
+  profileModalHeader: {
+    paddingTop: spacing.sm,
+    marginBottom: spacing.md,
+    justifyContent: "flex-start",
+    gap: spacing.md,
+  },
+  profileModalLogoutAction: {
+    marginLeft: "auto",
+    paddingVertical: 2,
+    paddingHorizontal: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: `${colors.error}55`,
+  },
+  profileModalLogoutActionPressed: {
+    opacity: 0.65,
+  },
+  profileModalLogoutText: {
+    color: colors.error,
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  profileModalTitle: {
+    fontSize: fontSize.xl,
+  },
+  profileModalIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.bg.tertiary,
+    borderWidth: 1,
+    borderColor: colors.border.default,
   },
   modalTitle: {
     color: colors.text.primary,
@@ -3362,9 +4414,11 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.lg,
   },
+  statCardWrap: {
+    width: "48%",
+    minWidth: 140,
+  },
   statCard: {
-    flex: 1,
-    minWidth: "45%",
     alignItems: "center",
     paddingVertical: spacing.lg,
   },
@@ -3378,6 +4432,52 @@ const styles = StyleSheet.create({
     color: colors.text.muted,
     fontSize: fontSize.sm,
     marginTop: 4,
+  },
+  statHint: {
+    color: colors.text.muted,
+    fontSize: fontSize.xs,
+    marginBottom: spacing.sm,
+    textAlign: "center",
+  },
+
+  // Admin - List Modal Items
+  listItemCard: {
+    marginBottom: spacing.sm,
+  },
+  listItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  listItemName: {
+    color: colors.text.primary,
+    fontSize: fontSize.md,
+    fontWeight: "700",
+  },
+  listItemSubtitle: {
+    color: colors.text.muted,
+    fontSize: fontSize.sm,
+    marginTop: 2,
+  },
+  listItemInfo: {
+    color: colors.text.secondary,
+    fontSize: fontSize.xs,
+    marginTop: 4,
+  },
+  statusRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  revokeBtn: {
+    backgroundColor: colors.error,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  revokeBtnText: {
+    color: colors.text.inverse,
+    fontSize: fontSize.sm,
+    fontWeight: "700",
   },
 
   // Admin - Pending
@@ -3495,5 +4595,102 @@ const styles = StyleSheet.create({
   selectedProviderType: {
     color: colors.text.muted,
     fontSize: fontSize.sm,
+  },
+
+  // Feedback Tab Styles
+  feedbackFilterScroll: {
+    maxHeight: 50,
+    marginBottom: spacing.md,
+  },
+  feedbackFilterContent: {
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+  },
+  feedbackFilterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.bg.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  feedbackFilterChipActive: {
+    backgroundColor: colors.brand.primary,
+    borderColor: colors.brand.primary,
+  },
+  feedbackFilterText: {
+    color: colors.text.muted,
+    fontSize: fontSize.sm,
+    fontWeight: "600",
+  },
+  feedbackFilterTextActive: {
+    color: colors.text.inverse,
+  },
+  feedbackCard: {
+    marginBottom: spacing.md,
+  },
+  feedbackHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  feedbackHeaderInfo: {
+    flex: 1,
+  },
+  feedbackProviderName: {
+    color: colors.text.primary,
+    fontSize: fontSize.md,
+    fontWeight: "700",
+  },
+  feedbackType: {
+    color: colors.text.muted,
+    fontSize: fontSize.sm,
+  },
+  feedbackRating: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: `${colors.brand.amber}20`,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.md,
+  },
+  feedbackRatingText: {
+    color: colors.brand.amber,
+    fontSize: fontSize.md,
+    fontWeight: "700",
+  },
+  feedbackComment: {
+    color: colors.text.secondary,
+    fontSize: fontSize.sm,
+    fontStyle: "italic",
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.default,
+    lineHeight: 20,
+  },
+  feedbackFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: spacing.md,
+    paddingTop: spacing.sm,
+  },
+  feedbackUserInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  feedbackUserName: {
+    color: colors.text.muted,
+    fontSize: fontSize.xs,
+  },
+  feedbackDate: {
+    color: colors.text.muted,
+    fontSize: fontSize.xs,
   },
 });
