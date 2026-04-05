@@ -45,12 +45,14 @@ import {
 // Tab configuration with icons
 const MECHANIC_TABS = [
   { id: "requests", label: "Requests", icon: "clipboard-outline" },
+  { id: "stats", label: "Stats", icon: "bar-chart-outline" },
   { id: "feedback", label: "Feedback", icon: "star-outline" },
 ];
 
 const FUEL_TABS = [
   { id: "requests", label: "Orders", icon: "clipboard-outline" },
   { id: "fuelTypes", label: "Prices", icon: "pricetag-outline" },
+  { id: "stats", label: "Stats", icon: "bar-chart-outline" },
   { id: "feedback", label: "Feedback", icon: "star-outline" },
 ];
 
@@ -285,6 +287,7 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
   const [profile, setProfile] = useState(null);
   const [requests, setRequests] = useState([]);
   const [feedback, setFeedback] = useState([]);
+  const [stats, setStats] = useState(null);
 
   // Request update modal
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -297,6 +300,42 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
   const [showResponseModal, setShowResponseModal] = useState(false);
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [responseText, setResponseText] = useState("");
+
+  // Stats list modal
+  const [showStatsListModal, setShowStatsListModal] = useState(false);
+  const [statsListType, setStatsListType] = useState("");
+  const [statsListData, setStatsListData] = useState([]);
+
+  const openStatsListModal = async (type) => {
+    setStatsListType(type);
+    setShowStatsListModal(true);
+    setLoading(true);
+    try {
+      const res = await mechanicAPI.getRequests(token);
+      const allRequests = res?.data || [];
+      let filtered = [];
+      if (type === "pending") {
+        filtered = allRequests.filter((r) => r.status === "pending");
+      } else if (type === "active") {
+        filtered = allRequests.filter((r) =>
+          ["accepted", "en-route", "arrived", "in-progress"].includes(r.status),
+        );
+      } else if (type === "today") {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        filtered = allRequests.filter(
+          (r) => r.status === "completed" && new Date(r.completedAt) >= today,
+        );
+      } else if (type === "completed") {
+        filtered = allRequests.filter((r) => r.status === "completed");
+      }
+      setStatsListData(filtered);
+    } catch (err) {
+      setError(err.message || "Failed to load requests");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -320,6 +359,20 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
       setRequests(res?.data || []);
     } catch (err) {
       setError(err.message || "Failed to load requests");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [token]);
+
+  const loadStats = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await mechanicAPI.getStats(token);
+      setStats(res?.data || null);
+    } catch (err) {
+      setError(err.message || "Failed to load stats");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -395,8 +448,217 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
 
   useEffect(() => {
     if (activeTab === "requests") loadRequests();
+    if (activeTab === "stats") loadStats();
     if (activeTab === "feedback") loadFeedback();
-  }, [activeTab, loadRequests, loadFeedback]);
+  }, [activeTab, loadRequests, loadStats, loadFeedback]);
+
+  // Stats Tab
+  if (activeTab === "stats") {
+    const statsListTitle =
+      statsListType === "pending"
+        ? "Pending Requests"
+        : statsListType === "active"
+          ? "Active Requests"
+          : statsListType === "today"
+            ? "Completed Today"
+            : "All Completed";
+
+    return (
+      <View style={styles.body}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.bodyContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadStats();
+              }}
+              tintColor={colors.brand.primary}
+            />
+          }
+        >
+          {loading && !showStatsListModal && (
+            <ActivityIndicator
+              style={styles.loader}
+              color={colors.brand.primary}
+            />
+          )}
+          <ErrorMessage message={error} />
+
+          <SectionTitle>Request Statistics</SectionTitle>
+          <Text style={styles.statHint}>Tap on a card to view requests</Text>
+
+          <View style={styles.statsGrid}>
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() => openStatsListModal("pending")}
+            >
+              <Card style={styles.statCard}>
+                <Ionicons
+                  name="time-outline"
+                  size={32}
+                  color={colors.brand.amber}
+                />
+                <Text style={styles.statValue}>{stats?.pending || 0}</Text>
+                <Text style={styles.statLabel}>Pending</Text>
+              </Card>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() => openStatsListModal("active")}
+            >
+              <Card style={styles.statCard}>
+                <Ionicons
+                  name="construct-outline"
+                  size={32}
+                  color={colors.brand.cyan}
+                />
+                <Text style={styles.statValue}>{stats?.active || 0}</Text>
+                <Text style={styles.statLabel}>Active</Text>
+              </Card>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() => openStatsListModal("today")}
+            >
+              <Card style={styles.statCard}>
+                <Ionicons
+                  name="today-outline"
+                  size={32}
+                  color={colors.brand.emerald}
+                />
+                <Text style={styles.statValue}>
+                  {stats?.completedToday || 0}
+                </Text>
+                <Text style={styles.statLabel}>Today</Text>
+              </Card>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() => openStatsListModal("completed")}
+            >
+              <Card style={styles.statCard}>
+                <Ionicons
+                  name="checkmark-done-outline"
+                  size={32}
+                  color={colors.brand.primary}
+                />
+                <Text style={styles.statValue}>
+                  {stats?.totalCompleted || 0}
+                </Text>
+                <Text style={styles.statLabel}>Total Done</Text>
+              </Card>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+
+        {/* Stats List Modal */}
+        <Modal visible={showStatsListModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.listModalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{statsListTitle}</Text>
+                <Pressable onPress={() => setShowStatsListModal(false)}>
+                  <Ionicons name="close" size={24} color={colors.text.muted} />
+                </Pressable>
+              </View>
+              {loading ? (
+                <ActivityIndicator
+                  style={styles.loader}
+                  color={colors.brand.primary}
+                />
+              ) : statsListData.length === 0 ? (
+                <Text style={styles.emptyText}>No requests found</Text>
+              ) : (
+                <ScrollView
+                  style={styles.listModalScrollView}
+                  contentContainerStyle={styles.listModalScrollContent}
+                >
+                  {statsListData.map((item) => (
+                    <Card key={item._id} style={styles.listItemCard}>
+                      <View style={styles.listItemRow}>
+                        <View style={styles.listItemTitleWrap}>
+                          <Text style={styles.listItemName} numberOfLines={2}>
+                            {item.problemDescription || "Service Request"}
+                          </Text>
+                        </View>
+                        <StatusBadge status={item.status} />
+                      </View>
+                      {/* Price Row */}
+                      <View style={styles.priceRow}>
+                        <Text style={styles.priceLabel}>Est. Cost:</Text>
+                        <Text style={styles.priceValue}>
+                          ₹{item.estimatedCost || 0}
+                        </Text>
+                      </View>
+                      <View style={styles.listItemDivider} />
+                      <View style={styles.listItemDetail}>
+                        <Ionicons
+                          name="person-outline"
+                          size={14}
+                          color={colors.text.muted}
+                          style={styles.listItemDetailIcon}
+                        />
+                        <Text style={styles.listItemDetailText}>
+                          {item.user?.name || "Unknown"}
+                        </Text>
+                      </View>
+                      {item.user?.phone && (
+                        <View style={styles.listItemDetail}>
+                          <Ionicons
+                            name="call-outline"
+                            size={14}
+                            color={colors.text.muted}
+                            style={styles.listItemDetailIcon}
+                          />
+                          <Text style={styles.listItemDetailText}>
+                            {item.user.phone}
+                          </Text>
+                        </View>
+                      )}
+                      {item.vehicleType && (
+                        <View style={styles.listItemDetail}>
+                          <Ionicons
+                            name="car-outline"
+                            size={14}
+                            color={colors.text.muted}
+                            style={styles.listItemDetailIcon}
+                          />
+                          <Text style={styles.listItemDetailText}>
+                            {item.vehicleType}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.listItemDetail}>
+                        <Ionicons
+                          name="calendar-outline"
+                          size={14}
+                          color={colors.text.muted}
+                          style={styles.listItemDetailIcon}
+                        />
+                        <Text style={styles.listItemDetailText}>
+                          {new Date(item.createdAt).toLocaleDateString()} at{" "}
+                          {new Date(item.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </Text>
+                      </View>
+                    </Card>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </Modal>
+      </View>
+    );
+  }
 
   // Feedback Tab
   if (activeTab === "feedback") {
@@ -649,74 +911,78 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
       {/* Update Status Modal */}
       <Modal visible={showUpdateModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Update Request</Text>
               <Pressable onPress={() => setShowUpdateModal(false)}>
                 <Ionicons name="close" size={24} color={colors.text.muted} />
               </Pressable>
             </View>
-
-            {selectedRequest && (
-              <View style={styles.selectedRequestInfo}>
-                <Text style={styles.selectedRequestText}>
-                  {selectedRequest.problemDescription || "Service Request"}
-                </Text>
-                <Text style={styles.selectedRequestCustomer}>
-                  Customer: {selectedRequest.user?.name || "Unknown"}
-                </Text>
-              </View>
-            )}
-
-            <Text style={styles.inputLabel}>Status</Text>
-            <View style={styles.statusButtonsWrap}>
-              {MECHANIC_STATUSES.map((status) => (
-                <Pressable
-                  key={status.value}
-                  style={[
-                    styles.statusButton,
-                    newStatus === status.value && {
-                      backgroundColor: status.color,
-                      borderColor: status.color,
-                    },
-                  ]}
-                  onPress={() => setNewStatus(status.value)}
-                >
-                  <Text
-                    style={[
-                      styles.statusButtonText,
-                      newStatus === status.value &&
-                        styles.statusButtonTextActive,
-                    ]}
-                  >
-                    {status.label}
+            <ScrollView
+              style={styles.modalScrollArea}
+              contentContainerStyle={styles.modalScrollAreaContent}
+              showsVerticalScrollIndicator={true}
+            >
+              {selectedRequest && (
+                <View style={styles.selectedRequestInfo}>
+                  <Text style={styles.selectedRequestText}>
+                    {selectedRequest.problemDescription || "Service Request"}
                   </Text>
-                </Pressable>
-              ))}
-            </View>
+                  <Text style={styles.selectedRequestCustomer}>
+                    Customer: {selectedRequest.user?.name || "Unknown"}
+                  </Text>
+                </View>
+              )}
 
-            <Text style={styles.inputLabel}>Estimated Cost (₹)</Text>
-            <TextInput
-              style={styles.input}
-              value={estimatedCost}
-              onChangeText={setEstimatedCost}
-              placeholder="Enter estimated cost"
-              placeholderTextColor={colors.text.muted}
-              keyboardType="numeric"
-            />
+              <Text style={styles.inputLabel}>Status</Text>
+              <View style={styles.statusButtonsWrap}>
+                {MECHANIC_STATUSES.map((status) => (
+                  <Pressable
+                    key={status.value}
+                    style={[
+                      styles.statusButton,
+                      newStatus === status.value && {
+                        backgroundColor: status.color,
+                        borderColor: status.color,
+                      },
+                    ]}
+                    onPress={() => setNewStatus(status.value)}
+                  >
+                    <Text
+                      style={[
+                        styles.statusButtonText,
+                        newStatus === status.value &&
+                          styles.statusButtonTextActive,
+                      ]}
+                    >
+                      {status.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
 
-            <Text style={styles.inputLabel}>Notes</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Add notes for the customer..."
-              placeholderTextColor={colors.text.muted}
-              multiline={true}
-              numberOfLines={3}
-            />
+              <Text style={styles.inputLabel}>Estimated Cost (₹)</Text>
+              <TextInput
+                style={styles.input}
+                value={estimatedCost}
+                onChangeText={setEstimatedCost}
+                placeholder="Enter estimated cost"
+                placeholderTextColor={colors.text.muted}
+                keyboardType="numeric"
+              />
 
-            <View style={styles.modalButtons}>
+              <Text style={styles.inputLabel}>Notes</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Add notes for the customer..."
+                placeholderTextColor={colors.text.muted}
+                multiline={true}
+                numberOfLines={3}
+              />
+            </ScrollView>
+            <View style={styles.modalButtonsFixed}>
               <Button
                 title="Cancel"
                 variant="outline"
@@ -747,6 +1013,7 @@ function FuelPanel({ token, activeTab, stationId }) {
   const [fuelTypes, setFuelTypes] = useState([]);
   const [requests, setRequests] = useState([]);
   const [feedback, setFeedback] = useState([]);
+  const [stats, setStats] = useState(null);
 
   // Request update modal
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -762,6 +1029,42 @@ function FuelPanel({ token, activeTab, stationId }) {
   const [showResponseModal, setShowResponseModal] = useState(false);
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [responseText, setResponseText] = useState("");
+
+  // Stats list modal
+  const [showStatsListModal, setShowStatsListModal] = useState(false);
+  const [statsListType, setStatsListType] = useState("");
+  const [statsListData, setStatsListData] = useState([]);
+
+  const openStatsListModal = async (type) => {
+    setStatsListType(type);
+    setShowStatsListModal(true);
+    setLoading(true);
+    try {
+      const res = await fuelStationAPI.getRequests(token);
+      const allRequests = res?.data || [];
+      let filtered = [];
+      if (type === "pending") {
+        filtered = allRequests.filter((r) => r.status === "pending");
+      } else if (type === "active") {
+        filtered = allRequests.filter((r) =>
+          ["confirmed", "preparing", "out-for-delivery"].includes(r.status),
+        );
+      } else if (type === "today") {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        filtered = allRequests.filter(
+          (r) => r.status === "delivered" && new Date(r.deliveredAt) >= today,
+        );
+      } else if (type === "completed") {
+        filtered = allRequests.filter((r) => r.status === "delivered");
+      }
+      setStatsListData(filtered);
+    } catch (err) {
+      setError(err.message || "Failed to load orders");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -802,6 +1105,20 @@ function FuelPanel({ token, activeTab, stationId }) {
       setRequests(res?.data || []);
     } catch (err) {
       setError(err.message || "Failed to load requests");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [token]);
+
+  const loadStats = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fuelStationAPI.getStats(token);
+      setStats(res?.data || null);
+    } catch (err) {
+      setError(err.message || "Failed to load stats");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -881,8 +1198,228 @@ function FuelPanel({ token, activeTab, stationId }) {
   useEffect(() => {
     if (activeTab === "fuelTypes") loadProfile();
     if (activeTab === "requests") loadRequests();
+    if (activeTab === "stats") loadStats();
     if (activeTab === "feedback") loadFeedback();
-  }, [activeTab, loadProfile, loadRequests, loadFeedback]);
+  }, [activeTab, loadProfile, loadRequests, loadStats, loadFeedback]);
+
+  // Stats Tab
+  if (activeTab === "stats") {
+    const statsListTitle =
+      statsListType === "pending"
+        ? "Pending Orders"
+        : statsListType === "active"
+          ? "Active Orders"
+          : statsListType === "today"
+            ? "Delivered Today"
+            : "All Delivered";
+
+    return (
+      <View style={styles.body}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.bodyContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadStats();
+              }}
+              tintColor={colors.brand.primary}
+            />
+          }
+        >
+          {loading && !showStatsListModal && (
+            <ActivityIndicator
+              style={styles.loader}
+              color={colors.brand.primary}
+            />
+          )}
+          <ErrorMessage message={error} />
+
+          <SectionTitle>Order Statistics</SectionTitle>
+          <Text style={styles.statHint}>Tap on a card to view orders</Text>
+
+          <View style={styles.statsGrid}>
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() => openStatsListModal("pending")}
+            >
+              <Card style={styles.statCard}>
+                <Ionicons
+                  name="time-outline"
+                  size={32}
+                  color={colors.brand.amber}
+                />
+                <Text style={styles.statValue}>{stats?.pending || 0}</Text>
+                <Text style={styles.statLabel}>Pending</Text>
+              </Card>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() => openStatsListModal("active")}
+            >
+              <Card style={styles.statCard}>
+                <Ionicons
+                  name="car-outline"
+                  size={32}
+                  color={colors.brand.cyan}
+                />
+                <Text style={styles.statValue}>{stats?.active || 0}</Text>
+                <Text style={styles.statLabel}>Active</Text>
+              </Card>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() => openStatsListModal("today")}
+            >
+              <Card style={styles.statCard}>
+                <Ionicons
+                  name="today-outline"
+                  size={32}
+                  color={colors.brand.emerald}
+                />
+                <Text style={styles.statValue}>
+                  {stats?.completedToday || 0}
+                </Text>
+                <Text style={styles.statLabel}>Today</Text>
+              </Card>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() => openStatsListModal("completed")}
+            >
+              <Card style={styles.statCard}>
+                <Ionicons
+                  name="checkmark-done-outline"
+                  size={32}
+                  color={colors.brand.primary}
+                />
+                <Text style={styles.statValue}>
+                  {stats?.totalCompleted || 0}
+                </Text>
+                <Text style={styles.statLabel}>Total Done</Text>
+              </Card>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+
+        {/* Stats List Modal */}
+        <Modal visible={showStatsListModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.listModalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{statsListTitle}</Text>
+                <Pressable onPress={() => setShowStatsListModal(false)}>
+                  <Ionicons name="close" size={24} color={colors.text.muted} />
+                </Pressable>
+              </View>
+              {loading ? (
+                <ActivityIndicator
+                  style={styles.loader}
+                  color={colors.brand.primary}
+                />
+              ) : statsListData.length === 0 ? (
+                <Text style={styles.emptyText}>No orders found</Text>
+              ) : (
+                <ScrollView
+                  style={styles.listModalScrollView}
+                  contentContainerStyle={styles.listModalScrollContent}
+                >
+                  {statsListData.map((item) => (
+                    <Card key={item._id} style={styles.listItemCard}>
+                      <View style={styles.listItemRow}>
+                        <Text style={styles.listItemName} numberOfLines={2}>
+                          {item.fuelType} - {item.quantity}L
+                        </Text>
+                        <StatusBadge status={item.status} />
+                      </View>
+                      {/* Price Row */}
+                      <View style={styles.priceRow}>
+                        <Text style={styles.priceLabel}>Total:</Text>
+                        <Text style={styles.priceValue}>
+                          ₹{item.totalAmount || 0}
+                        </Text>
+                      </View>
+                      <View style={styles.listItemDivider} />
+                      <View style={styles.listItemDetail}>
+                        <Ionicons
+                          name="person-outline"
+                          size={14}
+                          color={colors.text.muted}
+                          style={styles.listItemDetailIcon}
+                        />
+                        <Text style={styles.listItemDetailText}>
+                          {item.user?.name || "Unknown"}
+                        </Text>
+                      </View>
+                      {item.user?.phone && (
+                        <View style={styles.listItemDetail}>
+                          <Ionicons
+                            name="call-outline"
+                            size={14}
+                            color={colors.text.muted}
+                            style={styles.listItemDetailIcon}
+                          />
+                          <Text style={styles.listItemDetailText}>
+                            {item.user.phone}
+                          </Text>
+                        </View>
+                      )}
+                      {item.pricePerLiter && (
+                        <View style={styles.listItemDetail}>
+                          <Ionicons
+                            name="pricetag-outline"
+                            size={14}
+                            color={colors.text.muted}
+                            style={styles.listItemDetailIcon}
+                          />
+                          <Text style={styles.listItemDetailText}>
+                            ₹{item.pricePerLiter}/L
+                          </Text>
+                        </View>
+                      )}
+                      {item.paymentMethod && (
+                        <View style={styles.listItemDetail}>
+                          <Ionicons
+                            name="card-outline"
+                            size={14}
+                            color={colors.text.muted}
+                            style={styles.listItemDetailIcon}
+                          />
+                          <Text style={styles.listItemDetailText}>
+                            {item.paymentMethod}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.listItemDetail}>
+                        <Ionicons
+                          name="calendar-outline"
+                          size={14}
+                          color={colors.text.muted}
+                          style={styles.listItemDetailIcon}
+                        />
+                        <Text style={styles.listItemDetailText}>
+                          {new Date(item.createdAt).toLocaleDateString()} at{" "}
+                          {new Date(item.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </Text>
+                      </View>
+                    </Card>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </Modal>
+      </View>
+    );
+  }
 
   // Fuel Types Tab (Pricing)
   if (activeTab === "fuelTypes") {
@@ -1227,15 +1764,18 @@ function FuelPanel({ token, activeTab, stationId }) {
       {/* Update Status Modal */}
       <Modal visible={showUpdateModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalScrollContent}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Update Order</Text>
-                <Pressable onPress={() => setShowUpdateModal(false)}>
-                  <Ionicons name="close" size={24} color={colors.text.muted} />
-                </Pressable>
-              </View>
-
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Update Order</Text>
+              <Pressable onPress={() => setShowUpdateModal(false)}>
+                <Ionicons name="close" size={24} color={colors.text.muted} />
+              </Pressable>
+            </View>
+            <ScrollView
+              style={styles.modalScrollArea}
+              contentContainerStyle={styles.modalScrollAreaContent}
+              showsVerticalScrollIndicator={true}
+            >
               {selectedRequest && (
                 <View style={styles.selectedRequestInfo}>
                   <Text style={styles.selectedRequestText}>
@@ -1317,23 +1857,22 @@ function FuelPanel({ token, activeTab, stationId }) {
                   />
                 </>
               )}
-
-              <View style={styles.modalButtons}>
-                <Button
-                  title="Cancel"
-                  variant="outline"
-                  onPress={() => setShowUpdateModal(false)}
-                  style={styles.modalButton}
-                />
-                <Button
-                  title="Update"
-                  onPress={updateStatus}
-                  loading={loading}
-                  style={styles.modalButton}
-                />
-              </View>
+            </ScrollView>
+            <View style={styles.modalButtonsFixed}>
+              <Button
+                title="Cancel"
+                variant="outline"
+                onPress={() => setShowUpdateModal(false)}
+                style={styles.modalButton}
+              />
+              <Button
+                title="Update"
+                onPress={updateStatus}
+                loading={loading}
+                style={styles.modalButton}
+              />
             </View>
-          </ScrollView>
+          </View>
         </View>
       </Modal>
     </View>
@@ -1366,6 +1905,42 @@ function ChargingPanel({ token, activeTab, stationId }) {
   const [showResponseModal, setShowResponseModal] = useState(false);
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [responseText, setResponseText] = useState("");
+
+  // Stats list modal
+  const [showStatsListModal, setShowStatsListModal] = useState(false);
+  const [statsListType, setStatsListType] = useState("");
+  const [statsListData, setStatsListData] = useState([]);
+
+  const openStatsListModal = async (type) => {
+    setStatsListType(type);
+    setShowStatsListModal(true);
+    setLoading(true);
+    try {
+      const res = await chargingStationAPI.getRequests(token);
+      const allRequests = res?.data || [];
+      let filtered = [];
+      if (type === "pending") {
+        filtered = allRequests.filter((r) => r.status === "pending");
+      } else if (type === "active") {
+        filtered = allRequests.filter((r) =>
+          ["confirmed", "dispatched", "arrived", "charging"].includes(r.status),
+        );
+      } else if (type === "today") {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        filtered = allRequests.filter(
+          (r) => r.status === "completed" && new Date(r.completedAt) >= today,
+        );
+      } else if (type === "completed") {
+        filtered = allRequests.filter((r) => r.status === "completed");
+      }
+      setStatsListData(filtered);
+    } catch (err) {
+      setError(err.message || "Failed to load requests");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -1607,97 +2182,258 @@ function ChargingPanel({ token, activeTab, stationId }) {
 
   // Stats Tab
   if (activeTab === "stats") {
+    const statsListTitle =
+      statsListType === "pending"
+        ? "Pending Requests"
+        : statsListType === "active"
+          ? "Active Requests"
+          : statsListType === "today"
+            ? "Completed Today"
+            : "All Completed";
+
     return (
-      <ScrollView
-        style={styles.body}
-        contentContainerStyle={styles.bodyContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadStats();
-            }}
-            tintColor={colors.brand.primary}
-          />
-        }
-      >
-        {loading && (
-          <ActivityIndicator
-            style={styles.loader}
-            color={colors.brand.primary}
-          />
-        )}
-        <ErrorMessage message={error} />
-
-        <SectionTitle>Request Statistics</SectionTitle>
-
-        <View style={styles.statsGrid}>
-          <Card style={styles.statCard}>
-            <Ionicons
-              name="time-outline"
-              size={32}
-              color={colors.brand.amber}
+      <View style={styles.body}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.bodyContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadStats();
+              }}
+              tintColor={colors.brand.primary}
             />
-            <Text style={styles.statValue}>{stats?.pending || 0}</Text>
-            <Text style={styles.statLabel}>Pending</Text>
-          </Card>
-
-          <Card style={styles.statCard}>
-            <Ionicons
-              name="flash-outline"
-              size={32}
-              color={colors.brand.cyan}
-            />
-            <Text style={styles.statValue}>{stats?.active || 0}</Text>
-            <Text style={styles.statLabel}>Active</Text>
-          </Card>
-
-          <Card style={styles.statCard}>
-            <Ionicons
-              name="today-outline"
-              size={32}
-              color={colors.brand.emerald}
-            />
-            <Text style={styles.statValue}>{stats?.completedToday || 0}</Text>
-            <Text style={styles.statLabel}>Today</Text>
-          </Card>
-
-          <Card style={styles.statCard}>
-            <Ionicons
-              name="checkmark-done-outline"
-              size={32}
+          }
+        >
+          {loading && !showStatsListModal && (
+            <ActivityIndicator
+              style={styles.loader}
               color={colors.brand.primary}
             />
-            <Text style={styles.statValue}>{stats?.totalCompleted || 0}</Text>
-            <Text style={styles.statLabel}>Total Done</Text>
-          </Card>
-        </View>
+          )}
+          <ErrorMessage message={error} />
 
-        {/* Revenue Stats if available */}
-        {stats?.revenue && (
-          <>
-            <SectionTitle>Revenue</SectionTitle>
-            <Card>
-              <InfoRow
-                icon="cash-outline"
-                label="Today"
-                value={`₹${stats.revenue.today || 0}`}
-              />
-              <InfoRow
-                icon="calendar-outline"
-                label="This Week"
-                value={`₹${stats.revenue.week || 0}`}
-              />
-              <InfoRow
-                icon="calendar-outline"
-                label="This Month"
-                value={`₹${stats.revenue.month || 0}`}
-              />
-            </Card>
-          </>
-        )}
-      </ScrollView>
+          <SectionTitle>Request Statistics</SectionTitle>
+          <Text style={styles.statHint}>Tap on a card to view requests</Text>
+
+          <View style={styles.statsGrid}>
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() => openStatsListModal("pending")}
+            >
+              <Card style={styles.statCard}>
+                <Ionicons
+                  name="time-outline"
+                  size={32}
+                  color={colors.brand.amber}
+                />
+                <Text style={styles.statValue}>{stats?.pending || 0}</Text>
+                <Text style={styles.statLabel}>Pending</Text>
+              </Card>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() => openStatsListModal("active")}
+            >
+              <Card style={styles.statCard}>
+                <Ionicons
+                  name="flash-outline"
+                  size={32}
+                  color={colors.brand.cyan}
+                />
+                <Text style={styles.statValue}>{stats?.active || 0}</Text>
+                <Text style={styles.statLabel}>Active</Text>
+              </Card>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() => openStatsListModal("today")}
+            >
+              <Card style={styles.statCard}>
+                <Ionicons
+                  name="today-outline"
+                  size={32}
+                  color={colors.brand.emerald}
+                />
+                <Text style={styles.statValue}>
+                  {stats?.completedToday || 0}
+                </Text>
+                <Text style={styles.statLabel}>Today</Text>
+              </Card>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.statCardWrap}
+              onPress={() => openStatsListModal("completed")}
+            >
+              <Card style={styles.statCard}>
+                <Ionicons
+                  name="checkmark-done-outline"
+                  size={32}
+                  color={colors.brand.primary}
+                />
+                <Text style={styles.statValue}>
+                  {stats?.totalCompleted || 0}
+                </Text>
+                <Text style={styles.statLabel}>Total Done</Text>
+              </Card>
+            </TouchableOpacity>
+          </View>
+
+          {/* Revenue Stats if available */}
+          {stats?.revenue && (
+            <>
+              <SectionTitle>Revenue</SectionTitle>
+              <Card>
+                <InfoRow
+                  icon="cash-outline"
+                  label="Today"
+                  value={`₹${stats.revenue.today || 0}`}
+                />
+                <InfoRow
+                  icon="calendar-outline"
+                  label="This Week"
+                  value={`₹${stats.revenue.week || 0}`}
+                />
+                <InfoRow
+                  icon="calendar-outline"
+                  label="This Month"
+                  value={`₹${stats.revenue.month || 0}`}
+                />
+              </Card>
+            </>
+          )}
+        </ScrollView>
+
+        {/* Stats List Modal */}
+        <Modal visible={showStatsListModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.listModalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{statsListTitle}</Text>
+                <Pressable onPress={() => setShowStatsListModal(false)}>
+                  <Ionicons name="close" size={24} color={colors.text.muted} />
+                </Pressable>
+              </View>
+              {loading ? (
+                <ActivityIndicator
+                  style={styles.loader}
+                  color={colors.brand.primary}
+                />
+              ) : statsListData.length === 0 ? (
+                <Text style={styles.emptyText}>No requests found</Text>
+              ) : (
+                <ScrollView
+                  style={styles.listModalScrollView}
+                  contentContainerStyle={styles.listModalScrollContent}
+                >
+                  {statsListData.map((item) => (
+                    <Card key={item._id} style={styles.listItemCard}>
+                      <View style={styles.listItemRow}>
+                        <Text style={styles.listItemName} numberOfLines={2}>
+                          {item.vehicleType || "Vehicle"} -{" "}
+                          {item.connectorType || "Standard"}
+                        </Text>
+                        <StatusBadge status={item.status} />
+                      </View>
+                      {/* Price Row */}
+                      <View style={styles.priceRow}>
+                        <Text style={styles.priceLabel}>Total:</Text>
+                        <Text style={styles.priceValue}>
+                          ₹{item.totalAmount || 0}
+                        </Text>
+                      </View>
+                      <View style={styles.listItemDivider} />
+                      <View style={styles.listItemDetail}>
+                        <Ionicons
+                          name="person-outline"
+                          size={14}
+                          color={colors.text.muted}
+                          style={styles.listItemDetailIcon}
+                        />
+                        <Text style={styles.listItemDetailText}>
+                          {item.user?.name || "Unknown"}
+                        </Text>
+                      </View>
+                      {item.user?.phone && (
+                        <View style={styles.listItemDetail}>
+                          <Ionicons
+                            name="call-outline"
+                            size={14}
+                            color={colors.text.muted}
+                            style={styles.listItemDetailIcon}
+                          />
+                          <Text style={styles.listItemDetailText}>
+                            {item.user.phone}
+                          </Text>
+                        </View>
+                      )}
+                      {item.energyRequested != null && (
+                        <View style={styles.listItemDetail}>
+                          <Ionicons
+                            name="flash-outline"
+                            size={14}
+                            color={colors.text.muted}
+                            style={styles.listItemDetailIcon}
+                          />
+                          <Text style={styles.listItemDetailText}>
+                            {item.energyRequested} kWh requested
+                          </Text>
+                        </View>
+                      )}
+                      {item.pricePerKwh && (
+                        <View style={styles.listItemDetail}>
+                          <Ionicons
+                            name="pricetag-outline"
+                            size={14}
+                            color={colors.text.muted}
+                            style={styles.listItemDetailIcon}
+                          />
+                          <Text style={styles.listItemDetailText}>
+                            ₹{item.pricePerKwh}/kWh
+                          </Text>
+                        </View>
+                      )}
+                      {item.paymentMethod && (
+                        <View style={styles.listItemDetail}>
+                          <Ionicons
+                            name="card-outline"
+                            size={14}
+                            color={colors.text.muted}
+                            style={styles.listItemDetailIcon}
+                          />
+                          <Text style={styles.listItemDetailText}>
+                            {item.paymentMethod}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.listItemDetail}>
+                        <Ionicons
+                          name="calendar-outline"
+                          size={14}
+                          color={colors.text.muted}
+                          style={styles.listItemDetailIcon}
+                        />
+                        <Text style={styles.listItemDetailText}>
+                          {new Date(item.createdAt).toLocaleDateString()} at{" "}
+                          {new Date(item.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </Text>
+                      </View>
+                    </Card>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </Modal>
+      </View>
     );
   }
 
@@ -1952,15 +2688,18 @@ function ChargingPanel({ token, activeTab, stationId }) {
       {/* Update Status Modal */}
       <Modal visible={showUpdateModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalScrollContent}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Update Request</Text>
-                <Pressable onPress={() => setShowUpdateModal(false)}>
-                  <Ionicons name="close" size={24} color={colors.text.muted} />
-                </Pressable>
-              </View>
-
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Update Request</Text>
+              <Pressable onPress={() => setShowUpdateModal(false)}>
+                <Ionicons name="close" size={24} color={colors.text.muted} />
+              </Pressable>
+            </View>
+            <ScrollView
+              style={styles.modalScrollArea}
+              contentContainerStyle={styles.modalScrollAreaContent}
+              showsVerticalScrollIndicator={true}
+            >
               {selectedRequest && (
                 <View style={styles.selectedRequestInfo}>
                   <Text style={styles.selectedRequestText}>
@@ -2041,23 +2780,22 @@ function ChargingPanel({ token, activeTab, stationId }) {
                   />
                 </>
               )}
-
-              <View style={styles.modalButtons}>
-                <Button
-                  title="Cancel"
-                  variant="outline"
-                  onPress={() => setShowUpdateModal(false)}
-                  style={styles.modalButton}
-                />
-                <Button
-                  title="Update"
-                  onPress={updateStatus}
-                  loading={loading}
-                  style={styles.modalButton}
-                />
-              </View>
+            </ScrollView>
+            <View style={styles.modalButtonsFixed}>
+              <Button
+                title="Cancel"
+                variant="outline"
+                onPress={() => setShowUpdateModal(false)}
+                style={styles.modalButton}
+              />
+              <Button
+                title="Update"
+                onPress={updateStatus}
+                loading={loading}
+                style={styles.modalButton}
+              />
             </View>
-          </ScrollView>
+          </View>
         </View>
       </Modal>
     </View>
@@ -2251,7 +2989,13 @@ function AdminPanel({ token, activeTab }) {
     if (activeTab === "approvals") loadApprovals();
     if (activeTab === "activeRequests") loadActiveRequests();
     if (activeTab === "feedback") loadFeedback();
-  }, [activeTab, loadDashboard, loadApprovals, loadActiveRequests, loadFeedback]);
+  }, [
+    activeTab,
+    loadDashboard,
+    loadApprovals,
+    loadActiveRequests,
+    loadFeedback,
+  ]);
 
   // Overview Tab
   if (activeTab === "overview") {
@@ -2283,7 +3027,10 @@ function AdminPanel({ token, activeTab }) {
         <Text style={styles.statHint}>Tap on a card to view all entries</Text>
 
         <View style={styles.statsGrid}>
-          <TouchableOpacity style={styles.statCardWrap} onPress={() => openListModal("users")}>
+          <TouchableOpacity
+            style={styles.statCardWrap}
+            onPress={() => openListModal("users")}
+          >
             <Card style={styles.statCard}>
               <Ionicons
                 name="people-outline"
@@ -2295,7 +3042,10 @@ function AdminPanel({ token, activeTab }) {
             </Card>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.statCardWrap} onPress={() => openListModal("mechanics")}>
+          <TouchableOpacity
+            style={styles.statCardWrap}
+            onPress={() => openListModal("mechanics")}
+          >
             <Card style={styles.statCard}>
               <Ionicons
                 name="construct-outline"
@@ -2307,15 +3057,23 @@ function AdminPanel({ token, activeTab }) {
             </Card>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.statCardWrap} onPress={() => openListModal("fuel")}>
+          <TouchableOpacity
+            style={styles.statCardWrap}
+            onPress={() => openListModal("fuel")}
+          >
             <Card style={styles.statCard}>
               <Ionicons name="flame-outline" size={32} color={colors.error} />
-              <Text style={styles.statValue}>{dashboard?.fuelStations || 0}</Text>
+              <Text style={styles.statValue}>
+                {dashboard?.fuelStations || 0}
+              </Text>
               <Text style={styles.statLabel}>Fuel Stations</Text>
             </Card>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.statCardWrap} onPress={() => openListModal("charging")}>
+          <TouchableOpacity
+            style={styles.statCardWrap}
+            onPress={() => openListModal("charging")}
+          >
             <Card style={styles.statCard}>
               <Ionicons
                 name="flash-outline"
@@ -2348,7 +3106,11 @@ function AdminPanel({ token, activeTab }) {
                   onPress={() => setShowListModal(false)}
                   style={styles.closeBtn}
                 >
-                  <Ionicons name="close" size={24} color={colors.text.primary} />
+                  <Ionicons
+                    name="close"
+                    size={24}
+                    color={colors.text.primary}
+                  />
                 </TouchableOpacity>
               </View>
 
@@ -2360,7 +3122,7 @@ function AdminPanel({ token, activeTab }) {
               ) : listData.length === 0 ? (
                 <Text style={styles.emptyText}>No data found</Text>
               ) : (
-                <ScrollView 
+                <ScrollView
                   style={styles.listModalScrollView}
                   contentContainerStyle={styles.listModalScrollContent}
                   showsVerticalScrollIndicator={true}
@@ -2388,7 +3150,9 @@ function AdminPanel({ token, activeTab }) {
                         <View style={styles.listItemRow}>
                           <View style={{ flex: 1 }}>
                             <Text style={styles.listItemName}>{name}</Text>
-                            <Text style={styles.listItemSubtitle}>{subtitle}</Text>
+                            <Text style={styles.listItemSubtitle}>
+                              {subtitle}
+                            </Text>
                             {item.phone && (
                               <Text style={styles.listItemInfo}>
                                 📞 {item.phone}
@@ -2412,7 +3176,9 @@ function AdminPanel({ token, activeTab }) {
                                 {item.availability !== undefined && (
                                   <StatusBadge
                                     status={
-                                      item.availability ? "Available" : "Unavailable"
+                                      item.availability
+                                        ? "Available"
+                                        : "Unavailable"
                                     }
                                     color={
                                       item.availability
@@ -2710,23 +3476,31 @@ function AdminPanel({ token, activeTab }) {
 
   // Feedback Tab
   if (activeTab === "feedback") {
-    const filteredFeedback = feedbackFilter === "all" 
-      ? allFeedback 
-      : allFeedback.filter(f => f.serviceType === feedbackFilter);
+    const filteredFeedback =
+      feedbackFilter === "all"
+        ? allFeedback
+        : allFeedback.filter((f) => f.serviceType === feedbackFilter);
 
-    const mechanicCount = allFeedback.filter(f => f.serviceType === "Mechanic").length;
-    const fuelCount = allFeedback.filter(f => f.serviceType === "FuelStation").length;
+    const mechanicCount = allFeedback.filter(
+      (f) => f.serviceType === "Mechanic",
+    ).length;
+    const fuelCount = allFeedback.filter(
+      (f) => f.serviceType === "FuelStation",
+    ).length;
 
     return (
       <View style={styles.body}>
         {loading && (
-          <ActivityIndicator style={styles.loader} color={colors.brand.primary} />
+          <ActivityIndicator
+            style={styles.loader}
+            color={colors.brand.primary}
+          />
         )}
         <ErrorMessage message={error} />
 
         {/* Filter Chips */}
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.feedbackFilterScroll}
           contentContainerStyle={styles.feedbackFilterContent}
@@ -2738,10 +3512,12 @@ function AdminPanel({ token, activeTab }) {
             ]}
             onPress={() => setFeedbackFilter("all")}
           >
-            <Text style={[
-              styles.feedbackFilterText,
-              feedbackFilter === "all" && styles.feedbackFilterTextActive,
-            ]}>
+            <Text
+              style={[
+                styles.feedbackFilterText,
+                feedbackFilter === "all" && styles.feedbackFilterTextActive,
+              ]}
+            >
               All ({allFeedback.length})
             </Text>
           </TouchableOpacity>
@@ -2753,15 +3529,22 @@ function AdminPanel({ token, activeTab }) {
             ]}
             onPress={() => setFeedbackFilter("Mechanic")}
           >
-            <Ionicons 
-              name="construct" 
-              size={14} 
-              color={feedbackFilter === "Mechanic" ? colors.text.inverse : colors.brand.amber} 
+            <Ionicons
+              name="construct"
+              size={14}
+              color={
+                feedbackFilter === "Mechanic"
+                  ? colors.text.inverse
+                  : colors.brand.amber
+              }
             />
-            <Text style={[
-              styles.feedbackFilterText,
-              feedbackFilter === "Mechanic" && styles.feedbackFilterTextActive,
-            ]}>
+            <Text
+              style={[
+                styles.feedbackFilterText,
+                feedbackFilter === "Mechanic" &&
+                  styles.feedbackFilterTextActive,
+              ]}
+            >
               Mechanics ({mechanicCount})
             </Text>
           </TouchableOpacity>
@@ -2769,19 +3552,27 @@ function AdminPanel({ token, activeTab }) {
           <TouchableOpacity
             style={[
               styles.feedbackFilterChip,
-              feedbackFilter === "FuelStation" && styles.feedbackFilterChipActive,
+              feedbackFilter === "FuelStation" &&
+                styles.feedbackFilterChipActive,
             ]}
             onPress={() => setFeedbackFilter("FuelStation")}
           >
-            <Ionicons 
-              name="flame" 
-              size={14} 
-              color={feedbackFilter === "FuelStation" ? colors.text.inverse : colors.error} 
+            <Ionicons
+              name="flame"
+              size={14}
+              color={
+                feedbackFilter === "FuelStation"
+                  ? colors.text.inverse
+                  : colors.error
+              }
             />
-            <Text style={[
-              styles.feedbackFilterText,
-              feedbackFilter === "FuelStation" && styles.feedbackFilterTextActive,
-            ]}>
+            <Text
+              style={[
+                styles.feedbackFilterText,
+                feedbackFilter === "FuelStation" &&
+                  styles.feedbackFilterTextActive,
+              ]}
+            >
               Fuel ({fuelCount})
             </Text>
           </TouchableOpacity>
@@ -2823,8 +3614,11 @@ function AdminPanel({ token, activeTab }) {
             };
             const getProviderName = () => {
               // serviceProvider is populated with name or stationName
-              return item.serviceProvider?.name || item.serviceProvider?.stationName || 
-                (item.serviceType === "Mechanic" ? "Mechanic" : "Fuel Station");
+              return (
+                item.serviceProvider?.name ||
+                item.serviceProvider?.stationName ||
+                (item.serviceType === "Mechanic" ? "Mechanic" : "Fuel Station")
+              );
             };
 
             return (
@@ -2832,14 +3626,24 @@ function AdminPanel({ token, activeTab }) {
                 <View style={styles.feedbackHeader}>
                   <IconCircle icon={getIcon()} size={40} color={getColor()} />
                   <View style={styles.feedbackHeaderInfo}>
-                    <Text style={styles.feedbackProviderName}>{getProviderName()}</Text>
+                    <Text style={styles.feedbackProviderName}>
+                      {getProviderName()}
+                    </Text>
                     <Text style={styles.feedbackType}>
-                      {item.serviceType === "Mechanic" ? "Mechanic" : "Fuel Station"}
+                      {item.serviceType === "Mechanic"
+                        ? "Mechanic"
+                        : "Fuel Station"}
                     </Text>
                   </View>
                   <View style={styles.feedbackRating}>
-                    <Ionicons name="star" size={16} color={colors.brand.amber} />
-                    <Text style={styles.feedbackRatingText}>{item.rating || 0}</Text>
+                    <Ionicons
+                      name="star"
+                      size={16}
+                      color={colors.brand.amber}
+                    />
+                    <Text style={styles.feedbackRatingText}>
+                      {item.rating || 0}
+                    </Text>
                   </View>
                 </View>
 
@@ -2849,8 +3653,14 @@ function AdminPanel({ token, activeTab }) {
 
                 <View style={styles.feedbackFooter}>
                   <View style={styles.feedbackUserInfo}>
-                    <Ionicons name="person-outline" size={14} color={colors.text.muted} />
-                    <Text style={styles.feedbackUserName}>{item.user?.name || "User"}</Text>
+                    <Ionicons
+                      name="person-outline"
+                      size={14}
+                      color={colors.text.muted}
+                    />
+                    <Text style={styles.feedbackUserName}>
+                      {item.user?.name || "User"}
+                    </Text>
                   </View>
                   <Text style={styles.feedbackDate}>
                     {new Date(item.createdAt).toLocaleDateString()}
@@ -4104,6 +4914,29 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.7)",
     justifyContent: "flex-end",
   },
+  modalContainer: {
+    backgroundColor: colors.bg.secondary,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    maxHeight: "90%",
+    paddingTop: spacing.xl,
+  },
+  modalScrollArea: {
+    flexGrow: 0,
+    flexShrink: 1,
+    paddingHorizontal: spacing.xl,
+  },
+  modalScrollAreaContent: {
+    paddingBottom: spacing.md,
+  },
+  modalButtonsFixed: {
+    flexDirection: "row",
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.default,
+  },
   modalScrollContent: {
     maxHeight: "90%",
   },
@@ -4442,16 +5275,20 @@ const styles = StyleSheet.create({
 
   // Admin - List Modal Items
   listItemCard: {
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   listItemRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: spacing.sm,
   },
   listItemName: {
     color: colors.text.primary,
     fontSize: fontSize.md,
     fontWeight: "700",
+    flex: 1,
+    marginRight: spacing.sm,
   },
   listItemSubtitle: {
     color: colors.text.muted,
@@ -4460,8 +5297,47 @@ const styles = StyleSheet.create({
   },
   listItemInfo: {
     color: colors.text.secondary,
-    fontSize: fontSize.xs,
+    fontSize: fontSize.sm,
     marginTop: 4,
+  },
+  listItemSub: {
+    color: colors.text.secondary,
+    fontSize: fontSize.sm,
+    marginTop: spacing.xs,
+  },
+  listItemDetail: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: spacing.xs,
+  },
+  listItemDetailIcon: {
+    marginRight: spacing.xs,
+  },
+  listItemDetailText: {
+    color: colors.text.secondary,
+    fontSize: fontSize.sm,
+  },
+  listItemDivider: {
+    height: 1,
+    backgroundColor: colors.border.default,
+    marginVertical: spacing.sm,
+  },
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  priceLabel: {
+    color: colors.text.muted,
+    fontSize: fontSize.sm,
+    marginRight: spacing.xs,
+  },
+  priceValue: {
+    color: colors.brand.emerald,
+    fontSize: fontSize.lg,
+    fontWeight: "700",
   },
   statusRow: {
     flexDirection: "row",

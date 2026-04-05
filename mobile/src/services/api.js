@@ -104,6 +104,7 @@ export const mechanicAPI = {
       token,
       body,
     }),
+  getStats: (token) => request("/mechanics/stats", { token }),
 };
 
 export const fuelStationAPI = {
@@ -144,6 +145,7 @@ export const fuelStationAPI = {
       token,
       body,
     }),
+  getStats: (token) => request("/fuel-stations/stats", { token }),
 };
 
 export const chargingStationAPI = {

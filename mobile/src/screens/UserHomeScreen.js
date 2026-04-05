@@ -2533,7 +2533,9 @@ function ProfileTab({ token, user, onClose, bottomInset = 0 }) {
           </View>
           <View style={styles.profileHeaderInfo}>
             <Text style={styles.profileName}>{profile?.name || "User"}</Text>
-            <Text style={styles.profileEmail}>{profile?.email || "No email"}</Text>
+            <Text style={styles.profileEmail}>
+              {profile?.email || "No email"}
+            </Text>
             <View style={styles.profileRoleBadge}>
               <Text style={styles.profileRoleText}>User Account</Text>
             </View>
