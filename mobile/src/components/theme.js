@@ -15,7 +15,7 @@ export const colors = {
   border: {
     default: "#2a4a59",
     light: "#3a5a69",
-    focus: "#35d0ff",
+    focus: "#7ddbca",
   },
 
   // Text colors
@@ -28,8 +28,8 @@ export const colors = {
 
   // Brand colors
   brand: {
-    primary: "#35d0ff",
-    primaryDark: "#2ab5e0",
+    primary: "#7ddbca",
+    primaryDark: "#5cc9b5",
     amber: "#f59e0b",
     emerald: "#10b981",
     purple: "#8b5cf6",

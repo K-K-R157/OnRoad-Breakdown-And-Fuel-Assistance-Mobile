@@ -144,25 +144,34 @@ export default function RoleHomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
-      <View style={styles.header}>
+      {/* App Header - Branded */}
+      <View style={styles.appHeader}>
+        <View style={styles.appHeaderLeft}>
+          <View style={styles.appLogoContainer}>
+            <View style={styles.appLogoCircle}>
+              <Ionicons name="car" size={20} color="#1e3a5f" />
+              <View style={styles.appLogoWrench}>
+                <Ionicons
+                  name="construct"
+                  size={10}
+                  color={colors.text.inverse}
+                />
+              </View>
+            </View>
+          </View>
+          <View style={styles.appTitleWrap}>
+            <Text style={styles.appTitle}>On Road & Fuel Assistance</Text>
+            <Text style={styles.appSubtitle}>Help is on the way!</Text>
+          </View>
+        </View>
         <Pressable
-          style={styles.headerLeft}
+          style={({ pressed }) => [
+            styles.menuButton,
+            pressed && styles.menuButtonPressed,
+          ]}
           onPress={() => setShowProfileModal(true)}
         >
-          <View style={styles.avatarCircle}>
-            <Ionicons
-              name={getRoleIcon()}
-              size={20}
-              color={colors.brand.primary}
-            />
-          </View>
-          <View style={styles.headerTextWrap}>
-            <Text style={styles.userName}>
-              {session?.user?.name || "Provider"}
-            </Text>
-            <Text style={styles.roleTitle}>{getRoleTitle()}</Text>
-          </View>
+          <Ionicons name="menu" size={24} color={colors.text.primary} />
         </Pressable>
       </View>
 
@@ -178,7 +187,11 @@ export default function RoleHomeScreen() {
           return (
             <Pressable
               key={tab.id}
-              style={[styles.tabButton, selected && styles.tabButtonActive]}
+              style={({ pressed }) => [
+                styles.tabButton,
+                selected && styles.tabButtonActive,
+                pressed && !selected && styles.tabButtonPressed,
+              ]}
               onPress={() => setActiveTab(tab.id)}
             >
               <Ionicons
@@ -589,14 +602,6 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
                         </View>
                         <StatusBadge status={item.status} />
                       </View>
-                      {/* Price Row */}
-                      <View style={styles.priceRow}>
-                        <Text style={styles.priceLabel}>Est. Cost:</Text>
-                        <Text style={styles.priceValue}>
-                          ₹{item.estimatedCost || 0}
-                        </Text>
-                      </View>
-                      <View style={styles.listItemDivider} />
                       <View style={styles.listItemDetail}>
                         <Ionicons
                           name="person-outline"
@@ -642,11 +647,14 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
                           style={styles.listItemDetailIcon}
                         />
                         <Text style={styles.listItemDetailText}>
-                          {new Date(item.createdAt).toLocaleDateString()} at{" "}
-                          {new Date(item.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          {new Date(item.createdAt).toLocaleDateString()}
+                        </Text>
+                      </View>
+                      {/* Price Row */}
+                      <View style={styles.priceRow}>
+                        <Text style={styles.priceLabel}>Est. Cost:</Text>
+                        <Text style={styles.priceValue}>
+                          ₹{item.estimatedCost || 0}
                         </Text>
                       </View>
                     </Card>
@@ -1332,19 +1340,13 @@ function FuelPanel({ token, activeTab, stationId }) {
                   {statsListData.map((item) => (
                     <Card key={item._id} style={styles.listItemCard}>
                       <View style={styles.listItemRow}>
-                        <Text style={styles.listItemName} numberOfLines={2}>
-                          {item.fuelType} - {item.quantity}L
-                        </Text>
+                        <View style={styles.listItemTitleWrap}>
+                          <Text style={styles.listItemName} numberOfLines={2}>
+                            {item.fuelType} - {item.quantity}L
+                          </Text>
+                        </View>
                         <StatusBadge status={item.status} />
                       </View>
-                      {/* Price Row */}
-                      <View style={styles.priceRow}>
-                        <Text style={styles.priceLabel}>Total:</Text>
-                        <Text style={styles.priceValue}>
-                          ₹{item.totalAmount || 0}
-                        </Text>
-                      </View>
-                      <View style={styles.listItemDivider} />
                       <View style={styles.listItemDetail}>
                         <Ionicons
                           name="person-outline"
@@ -1403,11 +1405,14 @@ function FuelPanel({ token, activeTab, stationId }) {
                           style={styles.listItemDetailIcon}
                         />
                         <Text style={styles.listItemDetailText}>
-                          {new Date(item.createdAt).toLocaleDateString()} at{" "}
-                          {new Date(item.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          {new Date(item.createdAt).toLocaleDateString()}
+                        </Text>
+                      </View>
+                      {/* Price Row */}
+                      <View style={styles.priceRow}>
+                        <Text style={styles.priceLabel}>Total:</Text>
+                        <Text style={styles.priceValue}>
+                          ₹{item.totalPrice || 0}
                         </Text>
                       </View>
                     </Card>
@@ -2334,20 +2339,14 @@ function ChargingPanel({ token, activeTab, stationId }) {
                   {statsListData.map((item) => (
                     <Card key={item._id} style={styles.listItemCard}>
                       <View style={styles.listItemRow}>
-                        <Text style={styles.listItemName} numberOfLines={2}>
-                          {item.vehicleType || "Vehicle"} -{" "}
-                          {item.connectorType || "Standard"}
-                        </Text>
+                        <View style={styles.listItemTitleWrap}>
+                          <Text style={styles.listItemName} numberOfLines={2}>
+                            {item.vehicleType || "Vehicle"} -{" "}
+                            {item.connectorType || "Standard"}
+                          </Text>
+                        </View>
                         <StatusBadge status={item.status} />
                       </View>
-                      {/* Price Row */}
-                      <View style={styles.priceRow}>
-                        <Text style={styles.priceLabel}>Total:</Text>
-                        <Text style={styles.priceValue}>
-                          ₹{item.totalAmount || 0}
-                        </Text>
-                      </View>
-                      <View style={styles.listItemDivider} />
                       <View style={styles.listItemDetail}>
                         <Ionicons
                           name="person-outline"
@@ -2372,7 +2371,7 @@ function ChargingPanel({ token, activeTab, stationId }) {
                           </Text>
                         </View>
                       )}
-                      {item.energyRequested != null && (
+                      {item.estimatedEnergyNeeded != null && (
                         <View style={styles.listItemDetail}>
                           <Ionicons
                             name="flash-outline"
@@ -2381,7 +2380,7 @@ function ChargingPanel({ token, activeTab, stationId }) {
                             style={styles.listItemDetailIcon}
                           />
                           <Text style={styles.listItemDetailText}>
-                            {item.energyRequested} kWh requested
+                            {item.estimatedEnergyNeeded} kWh
                           </Text>
                         </View>
                       )}
@@ -2419,11 +2418,14 @@ function ChargingPanel({ token, activeTab, stationId }) {
                           style={styles.listItemDetailIcon}
                         />
                         <Text style={styles.listItemDetailText}>
-                          {new Date(item.createdAt).toLocaleDateString()} at{" "}
-                          {new Date(item.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          {new Date(item.createdAt).toLocaleDateString()}
+                        </Text>
+                      </View>
+                      {/* Price Row */}
+                      <View style={styles.priceRow}>
+                        <Text style={styles.priceLabel}>Total:</Text>
+                        <Text style={styles.priceValue}>
+                          ₹{item.totalPrice || 0}
                         </Text>
                       </View>
                     </Card>
@@ -4044,27 +4046,66 @@ function ProfileModalContent({ token, user, role, bottomInset = 0 }) {
     >
       {error ? <ErrorMessage message={error} /> : null}
 
-      {/* Avatar Section */}
-      <View style={modalStyles.avatarSection}>
-        <View style={modalStyles.avatar}>
-          <Ionicons
-            name={
-              role === "mechanic"
-                ? "construct"
-                : role === "fuelStation"
-                  ? "flame"
-                  : role === "chargingStation"
-                    ? "flash"
-                    : "person"
-            }
-            size={40}
-            color={colors.brand.primary}
-          />
+      {/* Profile Hero Card */}
+      <View style={modalStyles.profileHeroCard}>
+        <View style={modalStyles.profileHeroGradient}>
+          {/* Decorative circles */}
+          <View style={modalStyles.profileDecorCircle1} />
+          <View style={modalStyles.profileDecorCircle2} />
+
+          <View style={modalStyles.profileHeroContent}>
+            <View style={modalStyles.profileAvatarContainer}>
+              <View style={modalStyles.profileAvatar}>
+                <Ionicons
+                  name={
+                    role === "mechanic"
+                      ? "construct"
+                      : role === "fuelStation"
+                        ? "flame"
+                        : role === "chargingStation"
+                          ? "flash"
+                          : "person"
+                  }
+                  size={36}
+                  color={colors.brand.primary}
+                />
+              </View>
+              <View style={modalStyles.profileOnlineDot} />
+            </View>
+
+            <View style={modalStyles.profileHeroInfo}>
+              <Text style={modalStyles.profileHeroName}>
+                {name ||
+                  profile?.name ||
+                  profile?.stationName ||
+                  profile?.ownerName ||
+                  "Your Profile"}
+              </Text>
+              <View style={modalStyles.profileRoleBadge}>
+                <Ionicons
+                  name={
+                    role === "mechanic"
+                      ? "build-outline"
+                      : role === "fuelStation"
+                        ? "flame-outline"
+                        : role === "chargingStation"
+                          ? "flash-outline"
+                          : "shield-checkmark-outline"
+                  }
+                  size={12}
+                  color={colors.text.inverse}
+                />
+                <Text style={modalStyles.profileRoleText}>
+                  {getRoleLabel()}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <Text style={modalStyles.profileEmailText}>
+            {profile?.email || user?.email}
+          </Text>
         </View>
-        <Text style={modalStyles.roleLabel}>{getRoleLabel()}</Text>
-        <Text style={modalStyles.emailLabel}>
-          {profile?.email || user?.email}
-        </Text>
       </View>
 
       {/* Admin just shows info */}
@@ -4536,28 +4577,100 @@ const modalStyles = StyleSheet.create({
     minHeight: 0,
     padding: spacing.md,
   },
-  avatarSection: {
-    alignItems: "center",
+  // Profile Hero Card
+  profileHeroCard: {
     marginBottom: spacing.lg,
+    borderRadius: borderRadius.xl,
+    overflow: "hidden",
+    shadowColor: colors.brand.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  avatar: {
+  profileHeroGradient: {
+    backgroundColor: colors.brand.primary,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    position: "relative",
+  },
+  profileDecorCircle1: {
+    position: "absolute",
+    top: -30,
+    right: -30,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  profileDecorCircle2: {
+    position: "absolute",
+    bottom: -20,
+    left: -20,
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: `${colors.brand.primary}20`,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  profileHeroContent: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: spacing.md,
     marginBottom: spacing.sm,
   },
-  roleLabel: {
-    color: colors.brand.primary,
-    fontSize: fontSize.md,
+  profileAvatarContainer: {
+    position: "relative",
+  },
+  profileAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.bg.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  profileOnlineDot: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.brand.emerald,
+    borderWidth: 2,
+    borderColor: colors.brand.primary,
+  },
+  profileHeroInfo: {
+    flex: 1,
+  },
+  profileHeroName: {
+    color: colors.text.inverse,
+    fontSize: fontSize.xl,
+    fontWeight: "700",
+    marginBottom: spacing.xs,
+  },
+  profileRoleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  profileRoleText: {
+    color: colors.text.inverse,
+    fontSize: fontSize.xs,
     fontWeight: "600",
   },
-  emailLabel: {
-    color: colors.text.muted,
+  profileEmailText: {
+    color: "rgba(255,255,255,0.8)",
     fontSize: fontSize.sm,
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   sectionTitle: {
     color: colors.text.secondary,
@@ -4653,16 +4766,92 @@ const styles = StyleSheet.create({
   },
 
   // Header
+  // App Header - Branded
+  appHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.bg.primary,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.default,
+  },
+  appHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    flex: 1,
+  },
+  appLogoContainer: {
+    position: "relative",
+  },
+  appLogoCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#91d5db",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: colors.brand.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  appLogoWrench: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.brand.amber,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.bg.primary,
+  },
+  appTitleWrap: {
+    flex: 1,
+  },
+  appTitle: {
+    color: colors.text.primary,
+    fontSize: fontSize.md,
+    fontWeight: "700",
+  },
+  appSubtitle: {
+    color: colors.text.muted,
+    fontSize: fontSize.xs,
+    marginTop: 1,
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.bg.secondary,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  menuButtonPressed: {
+    backgroundColor: colors.bg.tertiary,
+  },
+
+  // Legacy styles (keeping for compatibility)
+  headerWrapper: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.xl,
     backgroundColor: colors.bg.secondary,
     borderWidth: 1,
     borderColor: colors.border.default,
@@ -4673,51 +4862,63 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     flex: 1,
   },
-  headerTextWrap: {
-    flex: 1,
-  },
   avatarCircle: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: `${colors.brand.primary}20`,
+    backgroundColor: colors.brand.primary,
     alignItems: "center",
     justifyContent: "center",
-  },
-  roleTitle: {
-    color: colors.text.secondary,
-    fontSize: fontSize.sm,
-    marginTop: 2,
   },
   userName: {
     color: colors.text.primary,
     fontSize: fontSize.lg,
     fontWeight: "700",
   },
+  roleTitle: {
+    color: colors.text.secondary,
+    fontSize: fontSize.sm,
+    marginTop: 2,
+  },
   // Tabs
   tabScrollView: {
     maxHeight: 50,
-    marginBottom: spacing.sm,
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
   },
   tabRow: {
     flexDirection: "row",
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     gap: spacing.sm,
   },
   tabButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: borderRadius.lg,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: borderRadius.full,
     backgroundColor: colors.bg.secondary,
     borderWidth: 1,
     borderColor: colors.border.default,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   tabButtonActive: {
     backgroundColor: colors.brand.primary,
     borderColor: colors.brand.primary,
+    shadowColor: colors.brand.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  tabButtonPressed: {
+    backgroundColor: colors.bg.tertiary,
+    transform: [{ scale: 0.98 }],
   },
   tabLabel: {
     color: colors.text.muted,
@@ -5244,22 +5445,23 @@ const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.md,
+    justifyContent: "space-between",
     marginBottom: spacing.lg,
   },
   statCardWrap: {
     width: "48%",
-    minWidth: 140,
+    marginBottom: spacing.md,
   },
   statCard: {
     alignItems: "center",
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
   },
   statValue: {
     color: colors.text.primary,
-    fontSize: fontSize.xxxl,
+    fontSize: fontSize.xxl,
     fontWeight: "700",
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
   statLabel: {
     color: colors.text.muted,
@@ -5281,14 +5483,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  listItemTitleWrap: {
+    flex: 1,
+    flexShrink: 1,
   },
   listItemName: {
     color: colors.text.primary,
     fontSize: fontSize.md,
     fontWeight: "700",
-    flex: 1,
-    marginRight: spacing.sm,
   },
   listItemSubtitle: {
     color: colors.text.muted,
@@ -5320,14 +5524,15 @@ const styles = StyleSheet.create({
   listItemDivider: {
     height: 1,
     backgroundColor: colors.border.default,
-    marginVertical: spacing.sm,
+    marginVertical: spacing.xs,
   },
   priceRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
+    marginTop: spacing.sm,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.default,
   },
   priceLabel: {
     color: colors.text.muted,
@@ -5336,7 +5541,7 @@ const styles = StyleSheet.create({
   },
   priceValue: {
     color: colors.brand.emerald,
-    fontSize: fontSize.lg,
+    fontSize: fontSize.md,
     fontWeight: "700",
   },
   statusRow: {

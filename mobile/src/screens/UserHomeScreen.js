@@ -93,19 +93,32 @@ export default function UserHomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
-      <View style={styles.header}>
+      {/* App Header */}
+      <View style={styles.appHeader}>
+        <View style={styles.appLogoRow}>
+          <View style={styles.appLogoCircle}>
+            <Ionicons name="car" size={24} color="#1e3a5f" />
+            <View style={styles.appLogoWrench}>
+              <Ionicons name="build" size={10} color={colors.text.inverse} />
+            </View>
+          </View>
+          <View style={styles.appTitleWrap}>
+            <Text style={styles.appTitle}>On Road & Fuel Assistance</Text>
+            <Text style={styles.appSubtitle}>Help is on the way!</Text>
+          </View>
+        </View>
         <Pressable
-          style={styles.headerLeft}
+          style={({ pressed }) => [
+            styles.menuButton,
+            pressed && styles.menuButtonPressed,
+          ]}
           onPress={() => setShowProfileModal(true)}
         >
-          <View style={styles.avatarCircle}>
-            <Ionicons name="person" size={20} color={colors.brand.primary} />
-          </View>
-          <View style={styles.headerTextWrap}>
-            <Text style={styles.userName}>{session?.user?.name || "User"}</Text>
-            <Text style={styles.roleTitle}>User Account</Text>
-          </View>
+          <Ionicons
+            name="person-outline"
+            size={20}
+            color={colors.text.primary}
+          />
         </Pressable>
       </View>
 
@@ -2525,23 +2538,45 @@ function ProfileTab({ token, user, onClose, bottomInset = 0 }) {
       keyboardShouldPersistTaps="handled"
       nestedScrollEnabled
     >
-      {/* Profile Header */}
-      <Card style={styles.profileHeaderCard}>
-        <View style={styles.profileAvatarWrap}>
-          <View style={styles.profileAvatar}>
-            <Ionicons name="person" size={40} color={colors.brand.primary} />
-          </View>
-          <View style={styles.profileHeaderInfo}>
-            <Text style={styles.profileName}>{profile?.name || "User"}</Text>
-            <Text style={styles.profileEmail}>
-              {profile?.email || "No email"}
-            </Text>
-            <View style={styles.profileRoleBadge}>
-              <Text style={styles.profileRoleText}>User Account</Text>
+      {/* Profile Hero Card */}
+      <View style={styles.profileHeroCard}>
+        <View style={styles.profileHeroGradient}>
+          {/* Decorative circles */}
+          <View style={styles.profileDecorCircle1} />
+          <View style={styles.profileDecorCircle2} />
+
+          <View style={styles.profileHeroContent}>
+            <View style={styles.profileAvatarContainer}>
+              <View style={styles.profileHeroAvatar}>
+                <Ionicons
+                  name="person"
+                  size={36}
+                  color={colors.brand.primary}
+                />
+              </View>
+              <View style={styles.profileOnlineDot} />
+            </View>
+
+            <View style={styles.profileHeroInfo}>
+              <Text style={styles.profileHeroName}>
+                {profile?.name || "User"}
+              </Text>
+              <View style={styles.profileHeroRoleBadge}>
+                <Ionicons
+                  name="person-outline"
+                  size={12}
+                  color={colors.text.inverse}
+                />
+                <Text style={styles.profileHeroRoleText}>User Account</Text>
+              </View>
             </View>
           </View>
+
+          <Text style={styles.profileEmailText}>
+            {profile?.email || "No email"}
+          </Text>
         </View>
-      </Card>
+      </View>
 
       <Card>
         <Text style={styles.inputLabel}>Full Name</Text>
@@ -2630,60 +2665,86 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.primary,
   },
 
-  // Header
-  header: {
+  // App Header (Branded)
+  appHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.bg.secondary,
-    borderWidth: 1,
-    borderColor: colors.border.default,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.bg.primary,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.default,
   },
-  headerLeft: {
+  appLogoRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
     flex: 1,
   },
-  headerTextWrap: {
-    flex: 1,
-  },
-  avatarCircle: {
+  appLogoCircle: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: `${colors.brand.primary}20`,
+    backgroundColor: "#91d5db",
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
+    shadowColor: colors.brand.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  welcome: {
-    color: colors.text.secondary,
-    fontSize: fontSize.sm,
+  appLogoWrench: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.brand.amber,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.bg.primary,
   },
-  userName: {
+  appTitleWrap: {
+    flex: 1,
+  },
+  appTitle: {
     color: colors.text.primary,
-    fontSize: fontSize.lg,
+    fontSize: fontSize.md,
     fontWeight: "700",
   },
-  roleTitle: {
-    color: colors.text.secondary,
-    fontSize: fontSize.sm,
-    marginTop: 2,
+  appSubtitle: {
+    color: colors.text.muted,
+    fontSize: fontSize.xs,
+    marginTop: 1,
   },
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.bg.secondary,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  menuButtonPressed: {
+    backgroundColor: colors.bg.tertiary,
+  },
+
   // Tabs
   tabScrollView: {
     maxHeight: 50,
-    marginBottom: spacing.sm,
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
   },
   tabRow: {
     flexDirection: "row",
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     gap: spacing.sm,
   },
   tabButton: {
@@ -2692,7 +2753,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.full,
     backgroundColor: colors.bg.secondary,
     borderWidth: 1,
     borderColor: colors.border.default,
@@ -2700,6 +2761,11 @@ const styles = StyleSheet.create({
   tabButtonActive: {
     backgroundColor: colors.brand.primary,
     borderColor: colors.brand.primary,
+    shadowColor: colors.brand.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   tabLabel: {
     color: colors.text.muted,
@@ -3303,48 +3369,101 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
 
-  // Profile styles
-  profileHeaderCard: {
+  // Profile Hero Card styles
+  profileHeroCard: {
     marginTop: spacing.md,
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.xl,
+    overflow: "hidden",
+    shadowColor: colors.brand.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  profileAvatarWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.lg,
+  profileHeroGradient: {
+    backgroundColor: colors.brand.primary,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    position: "relative",
   },
-  profileAvatar: {
+  profileDecorCircle1: {
+    position: "absolute",
+    top: -30,
+    right: -30,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  profileDecorCircle2: {
+    position: "absolute",
+    bottom: -20,
+    left: -20,
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: `${colors.brand.primary}20`,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  profileHeroContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  profileAvatarContainer: {
+    position: "relative",
+  },
+  profileHeroAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.bg.primary,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.3)",
   },
-  profileHeaderInfo: {
+  profileOnlineDot: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.brand.emerald,
+    borderWidth: 2,
+    borderColor: colors.brand.primary,
+  },
+  profileHeroInfo: {
     flex: 1,
   },
-  profileName: {
-    color: colors.text.primary,
-    fontSize: fontSize.xxl,
+  profileHeroName: {
+    color: colors.text.inverse,
+    fontSize: fontSize.xl,
     fontWeight: "700",
+    marginBottom: spacing.xs,
   },
-  profileEmail: {
-    color: colors.text.muted,
-    fontSize: fontSize.sm,
-    marginTop: 2,
-  },
-  profileRoleBadge: {
-    backgroundColor: `${colors.brand.primary}20`,
-    paddingHorizontal: 12,
+  profileHeroRoleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: borderRadius.full,
-    alignSelf: "flex-start",
-    marginTop: spacing.sm,
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
-  profileRoleText: {
-    color: colors.brand.primary,
+  profileHeroRoleText: {
+    color: colors.text.inverse,
     fontSize: fontSize.xs,
     fontWeight: "600",
+  },
+  profileEmailText: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: fontSize.sm,
+    marginTop: spacing.xs,
   },
   saveButton: {
     marginTop: spacing.xl,
