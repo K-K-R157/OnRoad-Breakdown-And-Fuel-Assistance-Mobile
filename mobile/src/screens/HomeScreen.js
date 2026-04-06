@@ -115,14 +115,13 @@ export default function HomeScreen({ navigation }) {
       >
         <View style={styles.headerLeft}>
           <View style={styles.logoCircle}>
-            <Ionicons name="car" size={20} color="#1e3a5f" />
+            <Ionicons name="car-sport" size={20} color="#b91c1c" />
             <View style={styles.logoWrench}>
               <Ionicons name="construct" size={8} color={colors.text.inverse} />
             </View>
           </View>
           <View>
-            <Text style={styles.brandName}>OnRoad</Text>
-            <Text style={styles.brandTagline}>Assistance</Text>
+            <Text style={styles.brandName}>On Road Assistance</Text>
           </View>
         </View>
         <Pressable
@@ -197,15 +196,6 @@ export default function HomeScreen({ navigation }) {
                 color={colors.text.inverse}
               />
               <Text style={styles.ctaPrimaryText}>Get Started</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.ctaSecondary,
-                pressed && styles.ctaSecondaryPressed,
-              ]}
-              onPress={() => navigation.navigate("Auth", { mode: "login" })}
-            >
-              <Text style={styles.ctaSecondaryText}>I have an account</Text>
             </Pressable>
           </View>
         </View>
@@ -360,7 +350,7 @@ export default function HomeScreen({ navigation }) {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>© 2024 OnRoad Assistance</Text>
+          <Text style={styles.footerText}>© 2024 On Road Assistance</Text>
           <Text style={styles.footerTagline}>
             Help is always on the way! 🛣️
           </Text>
@@ -395,10 +385,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#91d5db",
+    backgroundColor: colors.bg.secondary,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
+    borderWidth: 2,
+    borderColor: colors.border.default,
   },
   logoWrench: {
     position: "absolute",
@@ -628,7 +620,7 @@ const styles = StyleSheet.create({
   servicesGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
+    justifyContent: "center",
     gap: spacing.md,
   },
   serviceCard: {

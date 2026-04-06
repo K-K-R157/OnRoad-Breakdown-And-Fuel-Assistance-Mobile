@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
-  Modal,
   Pressable,
   KeyboardAvoidingView,
   Platform,
@@ -13,6 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -268,7 +268,7 @@ export default function AuthScreen() {
           <View style={styles.headerLogo}>
             <Ionicons name="car" size={16} color="#1e3a5f" />
           </View>
-          <Text style={styles.headerTitle}>On Road Assistance</Text>
+          <Text style={styles.headerTitle}>OnRoad</Text>
         </View>
         <View style={styles.headerRight} />
       </View>
@@ -281,11 +281,7 @@ export default function AuthScreen() {
         {/* Hero Section */}
         <View style={styles.heroSection}>
           <View style={styles.modeIndicator}>
-            <Ionicons
-              name={isRegisterMode ? "rocket-outline" : "car-sport"}
-              size={32}
-              color={colors.brand.primary}
-            />
+            <Text style={styles.heroEmoji}>{isRegisterMode ? "🚀" : "👋"}</Text>
           </View>
           <Text style={styles.heroTitle}>
             {isRegisterMode ? "Create Account" : "Welcome Back!"}
@@ -293,8 +289,62 @@ export default function AuthScreen() {
           <Text style={styles.heroSubtitle}>
             {isRegisterMode
               ? "Join our roadside assistance network"
-              : "Sign in to continue to On Road Assistance"}
+              : "Sign in to continue to OnRoad"}
           </Text>
+        </View>
+
+        {/* Mode Toggle */}
+        <View style={styles.modeToggleWrap}>
+          <Pressable
+            style={[
+              styles.modeToggleBtn,
+              !isRegisterMode && styles.modeToggleBtnActive,
+            ]}
+            onPress={() => {
+              setIsRegisterMode(false);
+              setError("");
+              setMessage("");
+            }}
+          >
+            <Ionicons
+              name="log-in-outline"
+              size={18}
+              color={!isRegisterMode ? colors.text.inverse : colors.text.muted}
+            />
+            <Text
+              style={[
+                styles.modeToggleText,
+                !isRegisterMode && styles.modeToggleTextActive,
+              ]}
+            >
+              Login
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.modeToggleBtn,
+              isRegisterMode && styles.modeToggleBtnActive,
+            ]}
+            onPress={() => {
+              setIsRegisterMode(true);
+              setError("");
+              setMessage("");
+            }}
+          >
+            <Ionicons
+              name="person-add-outline"
+              size={18}
+              color={isRegisterMode ? colors.text.inverse : colors.text.muted}
+            />
+            <Text
+              style={[
+                styles.modeToggleText,
+                isRegisterMode && styles.modeToggleTextActive,
+              ]}
+            >
+              Sign Up
+            </Text>
+          </Pressable>
         </View>
 
         {/* Messages */}
@@ -798,83 +848,25 @@ function Field({
 }
 
 function PickerField({ label, value, onChange, options }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const selectedOption = options.find((opt) => opt.value === value);
-
   return (
     <View style={styles.fieldBlock}>
       <Text style={styles.label}>{label}</Text>
-      <Pressable
-        style={({ pressed }) => [
-          styles.dropdownButton,
-          pressed && styles.dropdownButtonPressed,
-        ]}
-        onPress={() => setIsOpen(true)}
-      >
-        <Text style={styles.dropdownButtonText}>
-          {selectedOption?.label || "Select..."}
-        </Text>
-        <Ionicons name="chevron-down" size={18} color={colors.text.muted} />
-      </Pressable>
-
-      <Modal
-        visible={isOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsOpen(false)}
-      >
-        <Pressable
-          style={styles.dropdownOverlay}
-          onPress={() => setIsOpen(false)}
+      <View style={styles.pickerWrap}>
+        <Picker
+          selectedValue={value}
+          onValueChange={onChange}
+          dropdownIconColor={colors.text.secondary}
+          style={styles.picker}
         >
-          <View style={styles.dropdownModal}>
-            <View style={styles.dropdownHeader}>
-              <Text style={styles.dropdownHeaderText}>{label}</Text>
-              <Pressable
-                onPress={() => setIsOpen(false)}
-                style={styles.dropdownClose}
-              >
-                <Ionicons name="close" size={20} color={colors.text.muted} />
-              </Pressable>
-            </View>
-            <ScrollView style={styles.dropdownList}>
-              {options.map((item) => {
-                const isSelected = item.value === value;
-                return (
-                  <Pressable
-                    key={item.value}
-                    style={({ pressed }) => [
-                      styles.dropdownItem,
-                      isSelected && styles.dropdownItemSelected,
-                      pressed && styles.dropdownItemPressed,
-                    ]}
-                    onPress={() => {
-                      onChange(item.value);
-                      setIsOpen(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownItemText,
-                        isSelected && styles.dropdownItemTextSelected,
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                    {isSelected && (
-                      <Ionicons
-                        name="checkmark"
-                        size={18}
-                        color={colors.brand.primary}
-                      />
-                    )}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </Pressable>
-      </Modal>
+          {options.map((item) => (
+            <Picker.Item
+              key={item.value}
+              label={item.label}
+              value={item.value}
+            />
+          ))}
+        </Picker>
+      </View>
     </View>
   );
 }
@@ -1009,6 +1001,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.border.default,
   },
+  heroEmoji: {
+    fontSize: 32,
+  },
   heroTitle: {
     color: colors.text.primary,
     fontSize: 26,
@@ -1020,6 +1015,37 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     textAlign: "center",
     marginTop: spacing.xs,
+  },
+
+  // Mode Toggle
+  modeToggleWrap: {
+    flexDirection: "row",
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.lg,
+    padding: 4,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  modeToggleBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: borderRadius.md,
+  },
+  modeToggleBtnActive: {
+    backgroundColor: colors.brand.primary,
+  },
+  modeToggleText: {
+    color: colors.text.muted,
+    fontSize: fontSize.md,
+    fontWeight: "600",
+  },
+  modeToggleTextActive: {
+    color: colors.text.inverse,
   },
 
   // Messages
@@ -1216,88 +1242,16 @@ const styles = StyleSheet.create({
     right: 14,
     top: 38,
   },
-
-  // Custom Dropdown
-  dropdownButton: {
+  pickerWrap: {
     backgroundColor: colors.bg.input,
     borderColor: colors.border.default,
     borderWidth: 1,
     borderRadius: borderRadius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  dropdownButtonPressed: {
-    borderColor: colors.border.focus,
-  },
-  dropdownButtonText: {
-    color: colors.text.primary,
-    fontSize: fontSize.md,
-  },
-  dropdownOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: spacing.xl,
-  },
-  dropdownModal: {
-    backgroundColor: colors.bg.secondary,
-    borderRadius: borderRadius.xl,
-    width: "100%",
-    maxWidth: 340,
-    maxHeight: 320,
-    borderWidth: 1,
-    borderColor: colors.border.default,
     overflow: "hidden",
   },
-  dropdownHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
-    backgroundColor: colors.bg.tertiary,
-  },
-  dropdownHeaderText: {
+  picker: {
     color: colors.text.primary,
-    fontSize: fontSize.md,
-    fontWeight: "600",
   },
-  dropdownClose: {
-    padding: spacing.xs,
-  },
-  dropdownList: {
-    maxHeight: 250,
-  },
-  dropdownItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
-  },
-  dropdownItemSelected: {
-    backgroundColor: `${colors.brand.primary}15`,
-  },
-  dropdownItemPressed: {
-    backgroundColor: colors.bg.tertiary,
-  },
-  dropdownItemText: {
-    color: colors.text.primary,
-    fontSize: fontSize.md,
-  },
-  dropdownItemTextSelected: {
-    color: colors.brand.primary,
-    fontWeight: "600",
-  },
-
   toggleRow: {
     flexDirection: "row",
     justifyContent: "space-between",

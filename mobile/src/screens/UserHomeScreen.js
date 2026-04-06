@@ -97,13 +97,13 @@ export default function UserHomeScreen() {
       <View style={styles.appHeader}>
         <View style={styles.appLogoRow}>
           <View style={styles.appLogoCircle}>
-            <Ionicons name="car" size={24} color="#1e3a5f" />
+            <Ionicons name="car-sport" size={24} color="#b91c1c" />
             <View style={styles.appLogoWrench}>
               <Ionicons name="build" size={10} color={colors.text.inverse} />
             </View>
           </View>
           <View style={styles.appTitleWrap}>
-            <Text style={styles.appTitle}>On Road & Fuel Assistance</Text>
+            <Text style={styles.appTitle}>On Road Assistance</Text>
             <Text style={styles.appSubtitle}>Help is on the way!</Text>
           </View>
         </View>
@@ -871,7 +871,7 @@ function FuelTab({ token }) {
         <View style={styles.locationHeader}>
           <IconCircle
             icon="location-outline"
-            color={colors.brand.amber}
+            color={colors.brand.cyan}
             size={36}
           />
           <View style={styles.locationHeaderText}>
@@ -891,7 +891,7 @@ function FuelTab({ token }) {
           <Ionicons
             name="navigate-outline"
             size={18}
-            color={locationLoading ? colors.text.muted : colors.brand.amber}
+            color={locationLoading ? colors.text.muted : colors.brand.cyan}
           />
           <Text
             style={[
@@ -902,7 +902,7 @@ function FuelTab({ token }) {
             {locationLoading ? "Detecting..." : "Detect My Location"}
           </Text>
           {locationLoading && (
-            <ActivityIndicator size="small" color={colors.brand.amber} />
+            <ActivityIndicator size="small" color={colors.brand.cyan} />
           )}
         </Pressable>
 
@@ -972,7 +972,7 @@ function FuelTab({ token }) {
         icon="search-outline"
         onPress={search}
         loading={loading}
-        variant="amber"
+        variant="primary"
         style={styles.searchButton}
       />
 
@@ -983,7 +983,7 @@ function FuelTab({ token }) {
       <SectionTitle>Nearby Fuel Stations ({list.length})</SectionTitle>
 
       {loading && (
-        <ActivityIndicator color={colors.brand.amber} style={styles.loader} />
+        <ActivityIndicator color={colors.brand.cyan} style={styles.loader} />
       )}
 
       {!loading && list.length === 0 && (
@@ -1033,7 +1033,7 @@ function FuelTab({ token }) {
                 <View style={styles.selectedProviderInfo}>
                   <IconCircle
                     icon="flame"
-                    color={colors.brand.amber}
+                    color={colors.brand.cyan}
                     size={44}
                   />
                   <View style={styles.selectedProviderText}>
@@ -1171,7 +1171,7 @@ function FuelTab({ token }) {
                   icon="cart-outline"
                   onPress={sendRequest}
                   loading={loading}
-                  variant="amber"
+                  variant="primary"
                   style={styles.modalButton}
                 />
               </View>
@@ -1187,7 +1187,7 @@ function FuelStationCard({ station, onOrder }) {
   return (
     <Card style={styles.providerCard}>
       <View style={styles.providerHeader}>
-        <IconCircle icon="flame" color={colors.brand.amber} size={44} />
+        <IconCircle icon="flame" color={colors.brand.cyan} size={44} />
         <View style={styles.providerInfo}>
           <Text style={styles.providerName}>{station.stationName}</Text>
           <View style={styles.ratingRow}>
@@ -1276,7 +1276,7 @@ function FuelStationCard({ station, onOrder }) {
         title="Order Fuel"
         icon="cart-outline"
         onPress={onOrder}
-        variant="amber"
+        variant="primary"
         style={styles.requestButton}
       />
     </Card>
@@ -2291,7 +2291,7 @@ function FeedbackTab({ token, userId }) {
               <Ionicons
                 name="star-outline"
                 size={20}
-                color={colors.brand.amber}
+                color={colors.brand.primary}
               />
               <Text style={styles.pendingFeedbackText}>
                 {completedRequests.length} service(s) need your feedback
@@ -2327,7 +2327,7 @@ function FeedbackTab({ token, userId }) {
                           ? "flame"
                           : "flash"
                     }
-                    color={colors.brand.amber}
+                    color={colors.brand.cyan}
                     size={40}
                   />
                   <View style={styles.feedbackCardInfo}>
@@ -2345,7 +2345,7 @@ function FeedbackTab({ token, userId }) {
                 <Button
                   title="Leave Feedback"
                   icon="star-outline"
-                  variant="amber"
+                  variant="primary"
                   onPress={() => openFeedbackModal(item)}
                   style={styles.leaveFeedbackBtn}
                 />
@@ -2357,7 +2357,7 @@ function FeedbackTab({ token, userId }) {
           return (
             <Card style={styles.feedbackCard}>
               <View style={styles.feedbackCardHeader}>
-                <IconCircle icon="star" color={colors.brand.amber} size={40} />
+                <IconCircle icon="star" color={colors.brand.cyan} size={40} />
                 <View style={styles.feedbackCardInfo}>
                   <Text style={styles.feedbackProviderName}>
                     {item.serviceProvider?.name ||
@@ -2409,7 +2409,7 @@ function FeedbackTab({ token, userId }) {
 
             {selectedRequest && (
               <View style={styles.selectedProviderInfo}>
-                <IconCircle icon="star" color={colors.brand.amber} size={44} />
+                <IconCircle icon="star" color={colors.brand.cyan} size={44} />
                 <View style={styles.selectedProviderText}>
                   <Text style={styles.selectedProviderName}>
                     {selectedRequest.serviceProvider?.name ||
@@ -2458,7 +2458,7 @@ function FeedbackTab({ token, userId }) {
                 icon="send-outline"
                 onPress={submitFeedback}
                 loading={loading}
-                variant="amber"
+                variant="primary"
                 style={styles.modalButton}
               />
             </View>
@@ -2686,10 +2686,12 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#91d5db",
+    backgroundColor: colors.bg.secondary,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
+    borderWidth: 2,
+    borderColor: colors.border.default,
     shadowColor: colors.brand.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -2703,7 +2705,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: colors.brand.amber,
+    backgroundColor: colors.brand.cyan,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -3007,7 +3009,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   fuelPriceValue: {
-    color: colors.brand.amber,
+    color: colors.brand.cyan,
     fontSize: fontSize.md,
     fontWeight: "700",
     marginTop: 2,
@@ -3203,7 +3205,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   totalValue: {
-    color: colors.brand.amber,
+    color: colors.brand.cyan,
     fontSize: fontSize.lg,
     fontWeight: "700",
   },
@@ -3290,19 +3292,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    backgroundColor: "rgba(245, 158, 11, 0.1)",
+    backgroundColor: `${colors.brand.primary}15`,
     padding: spacing.md,
     borderRadius: borderRadius.md,
     marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: `${colors.brand.primary}30`,
   },
   pendingFeedbackText: {
-    color: colors.brand.amber,
+    color: colors.brand.primary,
     fontSize: fontSize.sm,
     fontWeight: "600",
     flex: 1,
   },
   feedbackPendingCard: {
-    borderColor: colors.brand.amber,
+    borderColor: colors.brand.primary,
     borderWidth: 1,
   },
   feedbackCard: {},
@@ -3362,7 +3366,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   ratingValue: {
-    color: colors.brand.amber,
+    color: colors.brand.primary,
     fontSize: fontSize.xl,
     fontWeight: "700",
     textAlign: "center",

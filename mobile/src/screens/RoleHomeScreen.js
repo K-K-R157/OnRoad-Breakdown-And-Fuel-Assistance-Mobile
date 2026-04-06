@@ -149,7 +149,7 @@ export default function RoleHomeScreen() {
         <View style={styles.appHeaderLeft}>
           <View style={styles.appLogoContainer}>
             <View style={styles.appLogoCircle}>
-              <Ionicons name="car" size={20} color="#1e3a5f" />
+              <Ionicons name="car-sport" size={20} color="#b91c1c" />
               <View style={styles.appLogoWrench}>
                 <Ionicons
                   name="construct"
@@ -160,7 +160,7 @@ export default function RoleHomeScreen() {
             </View>
           </View>
           <View style={styles.appTitleWrap}>
-            <Text style={styles.appTitle}>On Road & Fuel Assistance</Text>
+            <Text style={styles.appTitle}>On Road Assistance</Text>
             <Text style={styles.appSubtitle}>Help is on the way!</Text>
           </View>
         </View>
@@ -4790,9 +4790,11 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#91d5db",
+    backgroundColor: colors.bg.secondary,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.border.default,
     shadowColor: colors.brand.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
