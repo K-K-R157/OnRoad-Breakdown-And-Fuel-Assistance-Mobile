@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -18,6 +18,7 @@ import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
+import { useSocket } from "../context/SocketContext";
 import {
   adminAPI,
   authAPI,
@@ -41,6 +42,12 @@ import {
   RatingStars,
   SectionTitle,
 } from "../components/ui";
+import TrackingModal from "../components/TrackingModal";
+import {
+  shouldBroadcastLocation,
+  startLocationTracking,
+  stopLocationTracking,
+} from "../services/trackingService";
 
 // Tab configuration with icons
 const MECHANIC_TABS = [
@@ -318,6 +325,58 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
   const [showStatsListModal, setShowStatsListModal] = useState(false);
   const [statsListType, setStatsListType] = useState("");
   const [statsListData, setStatsListData] = useState([]);
+
+  // Tracking state
+  const [showTrackingModal, setShowTrackingModal] = useState(false);
+  const [trackingRequest, setTrackingRequest] = useState(null);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const locationSubscriptionRef = useRef(null);
+  const { sendProviderLocation, userLocation, requestStatus } = useSocket();
+
+  // Start/stop location broadcasting based on active en-route requests
+  useEffect(() => {
+    const enRouteRequest = requests.find((r) =>
+      shouldBroadcastLocation("mechanic", r.status)
+    );
+
+    if (enRouteRequest && !isBroadcasting) {
+      startBroadcasting(enRouteRequest);
+    } else if (!enRouteRequest && isBroadcasting) {
+      stopBroadcasting();
+    }
+
+    return () => {
+      if (locationSubscriptionRef.current) {
+        stopLocationTracking(locationSubscriptionRef.current);
+      }
+    };
+  }, [requests]);
+
+  // Refresh when socket status updates
+  useEffect(() => {
+    if (requestStatus) {
+      loadRequests();
+    }
+  }, [requestStatus]);
+
+  const startBroadcasting = async (request) => {
+    const result = await startLocationTracking((coords) => {
+      sendProviderLocation(request._id, request.user?._id || request.user, coords);
+    }, 5000);
+
+    if (result.success) {
+      locationSubscriptionRef.current = result.subscription;
+      setIsBroadcasting(true);
+    }
+  };
+
+  const stopBroadcasting = () => {
+    if (locationSubscriptionRef.current) {
+      stopLocationTracking(locationSubscriptionRef.current);
+      locationSubscriptionRef.current = null;
+    }
+    setIsBroadcasting(false);
+  };
 
   const openStatsListModal = async (type) => {
     setStatsListType(type);
@@ -904,6 +963,20 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
               )}
             </View>
 
+            {/* Navigate to User Button - show when en-route */}
+            {shouldBroadcastLocation("mechanic", item.status) && (
+              <Button
+                title="Navigate to User"
+                icon="navigate-outline"
+                variant="primary"
+                onPress={() => {
+                  setTrackingRequest(item);
+                  setShowTrackingModal(true);
+                }}
+                style={styles.navigateButton}
+              />
+            )}
+
             {item.status !== "completed" && item.status !== "cancelled" && (
               <Button
                 title="Update Status"
@@ -1007,6 +1080,18 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
           </View>
         </View>
       </Modal>
+
+      {/* Tracking Modal for navigating to user */}
+      <TrackingModal
+        visible={showTrackingModal}
+        onClose={() => {
+          setShowTrackingModal(false);
+          setTrackingRequest(null);
+        }}
+        request={trackingRequest}
+        requestType="mechanic"
+        isProvider={true}
+      />
     </View>
   );
 }
@@ -1042,6 +1127,58 @@ function FuelPanel({ token, activeTab, stationId }) {
   const [showStatsListModal, setShowStatsListModal] = useState(false);
   const [statsListType, setStatsListType] = useState("");
   const [statsListData, setStatsListData] = useState([]);
+
+  // Tracking state
+  const [showTrackingModal, setShowTrackingModal] = useState(false);
+  const [trackingRequest, setTrackingRequest] = useState(null);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const locationSubscriptionRef = useRef(null);
+  const { sendProviderLocation, userLocation, requestStatus } = useSocket();
+
+  // Start/stop location broadcasting based on active out-for-delivery requests
+  useEffect(() => {
+    const activeRequest = requests.find((r) =>
+      shouldBroadcastLocation("fuel", r.status)
+    );
+
+    if (activeRequest && !isBroadcasting) {
+      startBroadcasting(activeRequest);
+    } else if (!activeRequest && isBroadcasting) {
+      stopBroadcasting();
+    }
+
+    return () => {
+      if (locationSubscriptionRef.current) {
+        stopLocationTracking(locationSubscriptionRef.current);
+      }
+    };
+  }, [requests]);
+
+  // Refresh when socket status updates
+  useEffect(() => {
+    if (requestStatus) {
+      loadRequests();
+    }
+  }, [requestStatus]);
+
+  const startBroadcasting = async (request) => {
+    const result = await startLocationTracking((coords) => {
+      sendProviderLocation(request._id, request.user?._id || request.user, coords);
+    }, 5000);
+
+    if (result.success) {
+      locationSubscriptionRef.current = result.subscription;
+      setIsBroadcasting(true);
+    }
+  };
+
+  const stopBroadcasting = () => {
+    if (locationSubscriptionRef.current) {
+      stopLocationTracking(locationSubscriptionRef.current);
+      locationSubscriptionRef.current = null;
+    }
+    setIsBroadcasting(false);
+  };
 
   const openStatsListModal = async (type) => {
     setStatsListType(type);
@@ -1150,9 +1287,11 @@ function FuelPanel({ token, activeTab, stationId }) {
   const openUpdateModal = (request) => {
     setSelectedRequest(request);
     setNewStatus(request.status);
-    setDeliveryPerson(
-      request.deliveryPerson || { name: "", phone: "", vehicleNumber: "" },
-    );
+    setDeliveryPerson({
+      name: request.deliveryPersonName || "",
+      phone: request.deliveryPersonPhone || "",
+      vehicleNumber: request.vehicleNumber || "",
+    });
     setShowUpdateModal(true);
   };
 
@@ -1163,8 +1302,13 @@ function FuelPanel({ token, activeTab, stationId }) {
     setSuccess("");
     try {
       const updateData = { status: newStatus };
-      if (newStatus === "out-for-delivery" || newStatus === "delivered") {
-        updateData.deliveryPerson = deliveryPerson;
+      // Always include delivery person details if filled
+      if (deliveryPerson.name || deliveryPerson.phone || deliveryPerson.vehicleNumber) {
+        updateData.deliveryPerson = {
+          name: deliveryPerson.name,
+          phone: deliveryPerson.phone,
+          vehicleNumber: deliveryPerson.vehicleNumber,
+        };
       }
       await fuelStationAPI.updateRequestStatus(
         token,
@@ -1745,14 +1889,42 @@ function FuelPanel({ token, activeTab, stationId }) {
                 label="Total"
                 value={`₹${item.totalPrice || 0}`}
               />
-              {item.deliveryPerson?.name && (
+              {item.deliveryPersonName && (
                 <InfoRow
                   icon="bicycle-outline"
                   label="Delivery By"
-                  value={item.deliveryPerson.name}
+                  value={item.deliveryPersonName}
+                />
+              )}
+              {item.deliveryPersonPhone && (
+                <InfoRow
+                  icon="call-outline"
+                  label="Delivery Phone"
+                  value={item.deliveryPersonPhone}
+                />
+              )}
+              {item.vehicleNumber && (
+                <InfoRow
+                  icon="car-outline"
+                  label="Vehicle No."
+                  value={item.vehicleNumber}
                 />
               )}
             </View>
+
+            {/* Navigate to User Button - show when out-for-delivery */}
+            {shouldBroadcastLocation("fuel", item.status) && (
+              <Button
+                title="Navigate to User"
+                icon="navigate-outline"
+                variant="primary"
+                onPress={() => {
+                  setTrackingRequest(item);
+                  setShowTrackingModal(true);
+                }}
+                style={styles.navigateButton}
+              />
+            )}
 
             {item.status !== "delivered" && item.status !== "cancelled" && (
               <Button
@@ -1880,6 +2052,18 @@ function FuelPanel({ token, activeTab, stationId }) {
           </View>
         </View>
       </Modal>
+
+      {/* Tracking Modal for navigating to user */}
+      <TrackingModal
+        visible={showTrackingModal}
+        onClose={() => {
+          setShowTrackingModal(false);
+          setTrackingRequest(null);
+        }}
+        request={trackingRequest}
+        requestType="fuel"
+        isProvider={true}
+      />
     </View>
   );
 }
@@ -1915,6 +2099,58 @@ function ChargingPanel({ token, activeTab, stationId }) {
   const [showStatsListModal, setShowStatsListModal] = useState(false);
   const [statsListType, setStatsListType] = useState("");
   const [statsListData, setStatsListData] = useState([]);
+
+  // Tracking state
+  const [showTrackingModal, setShowTrackingModal] = useState(false);
+  const [trackingRequest, setTrackingRequest] = useState(null);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const locationSubscriptionRef = useRef(null);
+  const { sendProviderLocation, userLocation, requestStatus } = useSocket();
+
+  // Start/stop location broadcasting based on active dispatched requests
+  useEffect(() => {
+    const activeRequest = requests.find((r) =>
+      shouldBroadcastLocation("charging", r.status)
+    );
+
+    if (activeRequest && !isBroadcasting) {
+      startBroadcasting(activeRequest);
+    } else if (!activeRequest && isBroadcasting) {
+      stopBroadcasting();
+    }
+
+    return () => {
+      if (locationSubscriptionRef.current) {
+        stopLocationTracking(locationSubscriptionRef.current);
+      }
+    };
+  }, [requests]);
+
+  // Refresh when socket status updates
+  useEffect(() => {
+    if (requestStatus) {
+      loadRequests();
+    }
+  }, [requestStatus]);
+
+  const startBroadcasting = async (request) => {
+    const result = await startLocationTracking((coords) => {
+      sendProviderLocation(request._id, request.user?._id || request.user, coords);
+    }, 5000);
+
+    if (result.success) {
+      locationSubscriptionRef.current = result.subscription;
+      setIsBroadcasting(true);
+    }
+  };
+
+  const stopBroadcasting = () => {
+    if (locationSubscriptionRef.current) {
+      stopLocationTracking(locationSubscriptionRef.current);
+      locationSubscriptionRef.current = null;
+    }
+    setIsBroadcasting(false);
+  };
 
   const openStatsListModal = async (type) => {
     setStatsListType(type);
@@ -2023,9 +2259,11 @@ function ChargingPanel({ token, activeTab, stationId }) {
   const openUpdateModal = (request) => {
     setSelectedRequest(request);
     setNewStatus(request.status);
-    setTechnician(
-      request.technician || { name: "", phone: "", vehicleNumber: "" },
-    );
+    setTechnician({
+      name: request.technicianName || "",
+      phone: request.technicianPhone || "",
+      vehicleNumber: request.vehicleNumber || "",
+    });
     setShowUpdateModal(true);
   };
 
@@ -2036,12 +2274,13 @@ function ChargingPanel({ token, activeTab, stationId }) {
     setSuccess("");
     try {
       const updateData = { status: newStatus };
-      if (
-        newStatus === "dispatched" ||
-        newStatus === "arrived" ||
-        newStatus === "charging"
-      ) {
-        updateData.technician = technician;
+      // Always include technician details if filled
+      if (technician.name || technician.phone || technician.vehicleNumber) {
+        updateData.technician = {
+          name: technician.name,
+          phone: technician.phone,
+          vehicleNumber: technician.vehicleNumber,
+        };
       }
       await chargingStationAPI.updateRequestStatus(
         token,
@@ -2666,14 +2905,42 @@ function ChargingPanel({ token, activeTab, stationId }) {
                   value={`₹${item.estimatedCost}`}
                 />
               )}
-              {item.technician?.name && (
+              {item.technicianName && (
                 <InfoRow
                   icon="person-outline"
                   label="Technician"
-                  value={item.technician.name}
+                  value={item.technicianName}
+                />
+              )}
+              {item.technicianPhone && (
+                <InfoRow
+                  icon="call-outline"
+                  label="Tech. Phone"
+                  value={item.technicianPhone}
+                />
+              )}
+              {item.vehicleNumber && (
+                <InfoRow
+                  icon="car-outline"
+                  label="Vehicle No."
+                  value={item.vehicleNumber}
                 />
               )}
             </View>
+
+            {/* Navigate to User Button - show when dispatched */}
+            {shouldBroadcastLocation("charging", item.status) && (
+              <Button
+                title="Navigate to User"
+                icon="navigate-outline"
+                variant="primary"
+                onPress={() => {
+                  setTrackingRequest(item);
+                  setShowTrackingModal(true);
+                }}
+                style={styles.navigateButton}
+              />
+            )}
 
             {item.status !== "completed" && item.status !== "cancelled" && (
               <Button
@@ -2800,6 +3067,18 @@ function ChargingPanel({ token, activeTab, stationId }) {
           </View>
         </View>
       </Modal>
+
+      {/* Tracking Modal for navigating to user */}
+      <TrackingModal
+        visible={showTrackingModal}
+        onClose={() => {
+          setShowTrackingModal(false);
+          setTrackingRequest(null);
+        }}
+        request={trackingRequest}
+        requestType="charging"
+        isProvider={true}
+      />
     </View>
   );
 }
@@ -5028,8 +5307,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border.default,
   },
-  updateButton: {
+  navigateButton: {
     marginTop: spacing.md,
+  },
+  updateButton: {
+    marginTop: spacing.sm,
   },
 
   // Feedback styles

@@ -3,6 +3,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
+import { SocketProvider } from "./src/context/SocketContext";
 import AuthScreen from "./src/screens/AuthScreen";
 import UserHomeScreen from "./src/screens/UserHomeScreen";
 import RoleHomeScreen from "./src/screens/RoleHomeScreen";
@@ -50,10 +51,12 @@ function RootNavigator() {
 export default function App() {
   return (
     <AuthProvider>
-      <NavigationContainer>
-        <StatusBar style="light" />
-        <RootNavigator />
-      </NavigationContainer>
+      <SocketProvider>
+        <NavigationContainer>
+          <StatusBar style="light" />
+          <RootNavigator />
+        </NavigationContainer>
+      </SocketProvider>
     </AuthProvider>
   );
 }

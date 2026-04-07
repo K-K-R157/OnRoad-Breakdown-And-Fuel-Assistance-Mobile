@@ -19,6 +19,7 @@ import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
+import { useSocket } from "../context/SocketContext";
 import {
   chargingStationAPI,
   feedbackAPI,
@@ -40,6 +41,8 @@ import {
   SuccessMessage,
 } from "../components/ui";
 import { colors, borderRadius, spacing, fontSize } from "../components/theme";
+import TrackingModal from "../components/TrackingModal";
+import { isRequestTrackable } from "../services/trackingService";
 import * as Location from "expo-location";
 
 const TABS = [
@@ -1882,6 +1885,16 @@ function RequestsTab({ token }) {
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState("all");
+  const [trackingRequest, setTrackingRequest] = useState(null);
+  const [showTrackingModal, setShowTrackingModal] = useState(false);
+  const { requestStatus } = useSocket();
+
+  // Refresh requests when status updates via socket
+  useEffect(() => {
+    if (requestStatus) {
+      loadRequests();
+    }
+  }, [requestStatus]);
 
   const merged = useMemo(() => {
     const normalize = (type, items = []) =>
@@ -2090,6 +2103,24 @@ function RequestsTab({ token }) {
                       value={`${item.quantity}L ${item.fuelType}`}
                     />
                     <InfoRow label="Total" value={`₹${item.totalPrice || 0}`} />
+                    {item.deliveryPersonName && (
+                      <InfoRow
+                        label="Delivery Person"
+                        value={item.deliveryPersonName}
+                      />
+                    )}
+                    {item.deliveryPersonPhone && (
+                      <InfoRow
+                        label="Delivery Phone"
+                        value={item.deliveryPersonPhone}
+                      />
+                    )}
+                    {item.vehicleNumber && (
+                      <InfoRow
+                        label="Vehicle No."
+                        value={item.vehicleNumber}
+                      />
+                    )}
                   </>
                 )}
                 {item.requestType === "charging" && (
@@ -2103,12 +2134,32 @@ function RequestsTab({ token }) {
                       label="Battery"
                       value={`${item.currentBatteryPercent}% → ${item.targetBatteryPercent}%`}
                     />
+                    {item.technicianName && (
+                      <InfoRow
+                        label="Technician"
+                        value={item.technicianName}
+                      />
+                    )}
+                    {item.technicianPhone && (
+                      <InfoRow
+                        label="Technician Phone"
+                        value={item.technicianPhone}
+                      />
+                    )}
+                    {item.vehicleNumber && (
+                      <InfoRow
+                        label="Vehicle No."
+                        value={item.vehicleNumber}
+                      />
+                    )}
                   </>
                 )}
               </View>
 
-              {/* Provider Contact */}
+              {/* Provider Contact - Show delivery person/technician phone if available, else station phone */}
               {(item.mechanic?.phone ||
+                item.deliveryPersonPhone ||
+                item.technicianPhone ||
                 item.fuelStation?.phone ||
                 item.chargingStation?.phone) && (
                 <View style={styles.contactRow}>
@@ -2119,10 +2170,27 @@ function RequestsTab({ token }) {
                   />
                   <Text style={styles.contactText}>
                     {item.mechanic?.phone ||
+                      item.deliveryPersonPhone ||
+                      item.technicianPhone ||
                       item.fuelStation?.phone ||
                       item.chargingStation?.phone}
                   </Text>
                 </View>
+              )}
+
+              {/* Track Button - show for trackable statuses */}
+              {isRequestTrackable(item.requestType, item.status) && (
+                <Button
+                  title="Track Live Location"
+                  icon="location-outline"
+                  variant="primary"
+                  size="sm"
+                  onPress={() => {
+                    setTrackingRequest(item);
+                    setShowTrackingModal(true);
+                  }}
+                  style={styles.trackButton}
+                />
               )}
 
               {canCancel && (
@@ -2138,6 +2206,18 @@ function RequestsTab({ token }) {
             </Card>
           );
         }}
+      />
+
+      {/* Tracking Modal */}
+      <TrackingModal
+        visible={showTrackingModal}
+        onClose={() => {
+          setShowTrackingModal(false);
+          setTrackingRequest(null);
+        }}
+        request={trackingRequest}
+        requestType={trackingRequest?.requestType}
+        isProvider={false}
       />
     </View>
   );
@@ -3283,8 +3363,11 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     fontSize: fontSize.sm,
   },
-  cancelButton: {
+  trackButton: {
     marginTop: spacing.md,
+  },
+  cancelButton: {
+    marginTop: spacing.sm,
   },
 
   // Feedback styles
