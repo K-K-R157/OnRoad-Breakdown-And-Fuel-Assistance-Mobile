@@ -6,7 +6,7 @@
     "start": "expo start",
     "start:device": "cross-env EXPO_PUBLIC_API_BASE_URL=http://10.1.9.26:5000/api expo start",
     "start:device:tunnel": "cross-env EXPO_PUBLIC_API_BASE_URL=http://10.1.9.26:5000/api expo start --tunnel",
-    "android": "cross-env EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:5000/api expo start --android",
+    "android": "cross-env EXPO_PUBLIC_API_BASE_URL=http://10.3.1.141:5000/api expo start --android",
     "ios": "expo start --ios",
     "web": "cross-env EXPO_PUBLIC_API_BASE_URL=http://localhost:5000/api expo start --web"
   },

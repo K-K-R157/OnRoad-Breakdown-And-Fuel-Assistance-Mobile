@@ -99,26 +99,35 @@ io.on("connection", (socket) => {
   });
 
   // User shares their location with fuel station delivery person
-  socket.on("location:share-user-fuel", ({ requestId, fuelStationId, coords }) => {
-    if (requestId && fuelStationId && coords) {
-      io.to(`fuelStation:${fuelStationId}`).emit("location:user-update", {
-        requestId,
-        coords,
-        timestamp: Date.now(),
-      });
-    }
-  });
+  socket.on(
+    "location:share-user-fuel",
+    ({ requestId, fuelStationId, coords }) => {
+      if (requestId && fuelStationId && coords) {
+        io.to(`fuelStation:${fuelStationId}`).emit("location:user-update", {
+          requestId,
+          coords,
+          timestamp: Date.now(),
+        });
+      }
+    },
+  );
 
   // User shares their location with charging station technician
-  socket.on("location:share-user-charging", ({ requestId, chargingStationId, coords }) => {
-    if (requestId && chargingStationId && coords) {
-      io.to(`chargingStation:${chargingStationId}`).emit("location:user-update", {
-        requestId,
-        coords,
-        timestamp: Date.now(),
-      });
-    }
-  });
+  socket.on(
+    "location:share-user-charging",
+    ({ requestId, chargingStationId, coords }) => {
+      if (requestId && chargingStationId && coords) {
+        io.to(`chargingStation:${chargingStationId}`).emit(
+          "location:user-update",
+          {
+            requestId,
+            coords,
+            timestamp: Date.now(),
+          },
+        );
+      }
+    },
+  );
 
   socket.on("disconnect", () => {
     // Keep empty for now; useful if connection audits are required later.

@@ -336,7 +336,7 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
   // Start/stop location broadcasting based on active en-route requests
   useEffect(() => {
     const enRouteRequest = requests.find((r) =>
-      shouldBroadcastLocation("mechanic", r.status)
+      shouldBroadcastLocation("mechanic", r.status),
     );
 
     if (enRouteRequest && !isBroadcasting) {
@@ -361,7 +361,11 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
 
   const startBroadcasting = async (request) => {
     const result = await startLocationTracking((coords) => {
-      sendProviderLocation(request._id, request.user?._id || request.user, coords);
+      sendProviderLocation(
+        request._id,
+        request.user?._id || request.user,
+        coords,
+      );
     }, 5000);
 
     if (result.success) {
@@ -963,28 +967,36 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
               )}
             </View>
 
-            {/* Navigate to User Button - show when en-route */}
-            {shouldBroadcastLocation("mechanic", item.status) && (
-              <Button
-                title="Navigate to User"
-                icon="navigate-outline"
-                variant="primary"
-                onPress={() => {
-                  setTrackingRequest(item);
-                  setShowTrackingModal(true);
-                }}
-                style={styles.navigateButton}
-              />
-            )}
+            {/* Action Buttons Row */}
+            <View style={styles.actionButtonsRow}>
+              {/* Navigate to User Button - show when en-route */}
+              {shouldBroadcastLocation("mechanic", item.status) && (
+                <Button
+                  title="Navigate"
+                  icon="navigate-outline"
+                  variant="primary"
+                  onPress={() => {
+                    setTrackingRequest(item);
+                    setShowTrackingModal(true);
+                  }}
+                  style={styles.navigateButton}
+                />
+              )}
 
-            {item.status !== "completed" && item.status !== "cancelled" && (
-              <Button
-                title="Update Status"
-                icon="create-outline"
-                onPress={() => openUpdateModal(item)}
-                style={styles.updateButton}
-              />
-            )}
+              {item.status !== "completed" && item.status !== "cancelled" && (
+                <Button
+                  title="Update Status"
+                  icon="create-outline"
+                  variant="secondary"
+                  onPress={() => openUpdateModal(item)}
+                  style={[
+                    styles.updateButton,
+                    shouldBroadcastLocation("mechanic", item.status) &&
+                      styles.buttonHalf,
+                  ]}
+                />
+              )}
+            </View>
           </Card>
         )}
       />
@@ -1138,7 +1150,7 @@ function FuelPanel({ token, activeTab, stationId }) {
   // Start/stop location broadcasting based on active out-for-delivery requests
   useEffect(() => {
     const activeRequest = requests.find((r) =>
-      shouldBroadcastLocation("fuel", r.status)
+      shouldBroadcastLocation("fuel", r.status),
     );
 
     if (activeRequest && !isBroadcasting) {
@@ -1163,7 +1175,11 @@ function FuelPanel({ token, activeTab, stationId }) {
 
   const startBroadcasting = async (request) => {
     const result = await startLocationTracking((coords) => {
-      sendProviderLocation(request._id, request.user?._id || request.user, coords);
+      sendProviderLocation(
+        request._id,
+        request.user?._id || request.user,
+        coords,
+      );
     }, 5000);
 
     if (result.success) {
@@ -1303,7 +1319,11 @@ function FuelPanel({ token, activeTab, stationId }) {
     try {
       const updateData = { status: newStatus };
       // Always include delivery person details if filled
-      if (deliveryPerson.name || deliveryPerson.phone || deliveryPerson.vehicleNumber) {
+      if (
+        deliveryPerson.name ||
+        deliveryPerson.phone ||
+        deliveryPerson.vehicleNumber
+      ) {
         updateData.deliveryPerson = {
           name: deliveryPerson.name,
           phone: deliveryPerson.phone,
@@ -1912,28 +1932,36 @@ function FuelPanel({ token, activeTab, stationId }) {
               )}
             </View>
 
-            {/* Navigate to User Button - show when out-for-delivery */}
-            {shouldBroadcastLocation("fuel", item.status) && (
-              <Button
-                title="Navigate to User"
-                icon="navigate-outline"
-                variant="primary"
-                onPress={() => {
-                  setTrackingRequest(item);
-                  setShowTrackingModal(true);
-                }}
-                style={styles.navigateButton}
-              />
-            )}
+            {/* Action Buttons Row */}
+            <View style={styles.actionButtonsRow}>
+              {/* Navigate to User Button - show when out-for-delivery */}
+              {shouldBroadcastLocation("fuel", item.status) && (
+                <Button
+                  title="Navigate"
+                  icon="navigate-outline"
+                  variant="primary"
+                  onPress={() => {
+                    setTrackingRequest(item);
+                    setShowTrackingModal(true);
+                  }}
+                  style={styles.navigateButton}
+                />
+              )}
 
-            {item.status !== "delivered" && item.status !== "cancelled" && (
-              <Button
-                title="Update Order"
-                icon="create-outline"
-                onPress={() => openUpdateModal(item)}
-                style={styles.updateButton}
-              />
-            )}
+              {item.status !== "delivered" && item.status !== "cancelled" && (
+                <Button
+                  title="Update Order"
+                  icon="create-outline"
+                  variant="secondary"
+                  onPress={() => openUpdateModal(item)}
+                  style={[
+                    styles.updateButton,
+                    shouldBroadcastLocation("fuel", item.status) &&
+                      styles.buttonHalf,
+                  ]}
+                />
+              )}
+            </View>
           </Card>
         )}
       />
@@ -2110,7 +2138,7 @@ function ChargingPanel({ token, activeTab, stationId }) {
   // Start/stop location broadcasting based on active dispatched requests
   useEffect(() => {
     const activeRequest = requests.find((r) =>
-      shouldBroadcastLocation("charging", r.status)
+      shouldBroadcastLocation("charging", r.status),
     );
 
     if (activeRequest && !isBroadcasting) {
@@ -2135,7 +2163,11 @@ function ChargingPanel({ token, activeTab, stationId }) {
 
   const startBroadcasting = async (request) => {
     const result = await startLocationTracking((coords) => {
-      sendProviderLocation(request._id, request.user?._id || request.user, coords);
+      sendProviderLocation(
+        request._id,
+        request.user?._id || request.user,
+        coords,
+      );
     }, 5000);
 
     if (result.success) {
@@ -2928,28 +2960,36 @@ function ChargingPanel({ token, activeTab, stationId }) {
               )}
             </View>
 
-            {/* Navigate to User Button - show when dispatched */}
-            {shouldBroadcastLocation("charging", item.status) && (
-              <Button
-                title="Navigate to User"
-                icon="navigate-outline"
-                variant="primary"
-                onPress={() => {
-                  setTrackingRequest(item);
-                  setShowTrackingModal(true);
-                }}
-                style={styles.navigateButton}
-              />
-            )}
+            {/* Action Buttons Row */}
+            <View style={styles.actionButtonsRow}>
+              {/* Navigate to User Button - show when dispatched */}
+              {shouldBroadcastLocation("charging", item.status) && (
+                <Button
+                  title="Navigate"
+                  icon="navigate-outline"
+                  variant="primary"
+                  onPress={() => {
+                    setTrackingRequest(item);
+                    setShowTrackingModal(true);
+                  }}
+                  style={styles.navigateButton}
+                />
+              )}
 
-            {item.status !== "completed" && item.status !== "cancelled" && (
-              <Button
-                title="Update Status"
-                icon="create-outline"
-                onPress={() => openUpdateModal(item)}
-                style={styles.updateButton}
-              />
-            )}
+              {item.status !== "completed" && item.status !== "cancelled" && (
+                <Button
+                  title="Update Status"
+                  icon="create-outline"
+                  variant="secondary"
+                  onPress={() => openUpdateModal(item)}
+                  style={[
+                    styles.updateButton,
+                    shouldBroadcastLocation("charging", item.status) &&
+                      styles.buttonHalf,
+                  ]}
+                />
+              )}
+            </View>
           </Card>
         )}
       />
@@ -5307,11 +5347,20 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border.default,
   },
-  navigateButton: {
+  actionButtonsRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
     marginTop: spacing.md,
   },
+  navigateButton: {
+    flex: 1,
+    backgroundColor: colors.brand.primary,
+  },
   updateButton: {
-    marginTop: spacing.sm,
+    flex: 1,
+  },
+  buttonHalf: {
+    flex: 1,
   },
 
   // Feedback styles

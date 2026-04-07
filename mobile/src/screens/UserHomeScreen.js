@@ -2116,10 +2116,7 @@ function RequestsTab({ token }) {
                       />
                     )}
                     {item.vehicleNumber && (
-                      <InfoRow
-                        label="Vehicle No."
-                        value={item.vehicleNumber}
-                      />
+                      <InfoRow label="Vehicle No." value={item.vehicleNumber} />
                     )}
                   </>
                 )}
@@ -2135,10 +2132,7 @@ function RequestsTab({ token }) {
                       value={`${item.currentBatteryPercent}% → ${item.targetBatteryPercent}%`}
                     />
                     {item.technicianName && (
-                      <InfoRow
-                        label="Technician"
-                        value={item.technicianName}
-                      />
+                      <InfoRow label="Technician" value={item.technicianName} />
                     )}
                     {item.technicianPhone && (
                       <InfoRow
@@ -2147,10 +2141,7 @@ function RequestsTab({ token }) {
                       />
                     )}
                     {item.vehicleNumber && (
-                      <InfoRow
-                        label="Vehicle No."
-                        value={item.vehicleNumber}
-                      />
+                      <InfoRow label="Vehicle No." value={item.vehicleNumber} />
                     )}
                   </>
                 )}
