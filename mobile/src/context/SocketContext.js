@@ -14,6 +14,13 @@ const SocketContext = createContext(null);
 const SOCKET_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL?.replace("/api", "") ||
   "http://10.0.2.2:5000";
+const isDev = typeof __DEV__ !== "undefined" ? __DEV__ : process.env.NODE_ENV !== "production";
+const debugLog = (...args) => {
+  if (isDev) console.log(...args);
+};
+const debugError = (...args) => {
+  if (isDev) console.error(...args);
+};
 
 export function SocketProvider({ children }) {
   const { session } = useAuth();
@@ -38,29 +45,29 @@ export function SocketProvider({ children }) {
       socketRef.current = socket;
 
       socket.on("connect", () => {
-        console.log("Socket connected:", socket.id);
+        debugLog("Socket connected:", socket.id);
         setIsConnected(true);
 
         // Join room based on user role
         const role = session.user.role;
         const userId = session.user._id;
         socket.emit("join-room", { role, userId });
-        console.log(`Joined room: ${role}:${userId}`);
+        debugLog(`Joined room: ${role}:${userId}`);
       });
 
       socket.on("disconnect", () => {
-        console.log("Socket disconnected");
+        debugLog("Socket disconnected");
         setIsConnected(false);
       });
 
       socket.on("connect_error", (error) => {
-        console.error("Socket connection error:", error.message);
+        debugError("Socket connection error:", error.message);
         setIsConnected(false);
       });
 
       // Listen for provider location updates (for users)
       socket.on("location:tracking", (data) => {
-        console.log("Provider location received:", data);
+        debugLog("Provider location received:", data);
         setProviderLocation({
           requestId: data.requestId,
           latitude: data.coords.lat,
@@ -71,7 +78,7 @@ export function SocketProvider({ children }) {
 
       // Listen for user location updates (for providers)
       socket.on("location:user-update", (data) => {
-        console.log("User location received:", data);
+        debugLog("User location received:", data);
         setUserLocation({
           requestId: data.requestId,
           latitude: data.coords.lat,
@@ -82,7 +89,7 @@ export function SocketProvider({ children }) {
 
       // Listen for request status updates
       socket.on("request:status-updated", (data) => {
-        console.log("Request status updated:", data);
+        debugLog("Request status updated:", data);
         setRequestStatus(data);
       });
 

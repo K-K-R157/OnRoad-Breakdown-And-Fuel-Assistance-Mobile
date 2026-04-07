@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Platform, Dimensions } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, fontSize, borderRadius } from "./theme";
@@ -9,8 +9,6 @@ import {
   calculateDistance,
   calculateETA,
 } from "../services/trackingService";
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export default function LiveTrackingMap({
   userLocation,
