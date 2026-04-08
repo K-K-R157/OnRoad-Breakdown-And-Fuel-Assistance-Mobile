@@ -14,7 +14,10 @@ const SocketContext = createContext(null);
 const SOCKET_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL?.replace("/api", "") ||
   "http://10.0.2.2:5000";
-const isDev = typeof __DEV__ !== "undefined" ? __DEV__ : process.env.NODE_ENV !== "production";
+const isDev =
+  typeof __DEV__ !== "undefined"
+    ? __DEV__
+    : process.env.NODE_ENV !== "production";
 const debugLog = (...args) => {
   if (isDev) console.log(...args);
 };
