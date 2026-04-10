@@ -1,5 +1,9 @@
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL || "http://10.0.2.2:5000/api";
+const DEFAULT_PROD_API_URL =
+  "https://onroad-breakdown-g3brh6bbgqguefc3.southeastasia-01.azurewebsites.net/api";
+
+const API_BASE_URL = (
+  process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_PROD_API_URL
+).replace(/\/+$/, "");
 
 async function request(path, { method = "GET", token, body } = {}) {
   const headers = {

@@ -2,6 +2,7 @@ import { StatusBar } from "expo-status-bar";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { SocketProvider } from "./src/context/SocketContext";
 import AuthScreen from "./src/screens/AuthScreen";
@@ -50,14 +51,16 @@ function RootNavigator() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <SocketProvider>
-        <NavigationContainer>
-          <StatusBar style="light" />
-          <RootNavigator />
-        </NavigationContainer>
-      </SocketProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <SocketProvider>
+          <NavigationContainer>
+            <StatusBar style="light" translucent={false} />
+            <RootNavigator />
+          </NavigationContainer>
+        </SocketProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 

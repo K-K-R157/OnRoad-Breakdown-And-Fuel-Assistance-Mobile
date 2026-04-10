@@ -11,9 +11,12 @@ import { useAuth } from "./AuthContext";
 
 const SocketContext = createContext(null);
 
-const SOCKET_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL?.replace("/api", "") ||
-  "http://10.0.2.2:5000";
+const DEFAULT_PROD_API_URL =
+  "https://onroad-breakdown-g3brh6bbgqguefc3.southeastasia-01.azurewebsites.net/api";
+
+const SOCKET_URL = (
+  process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_PROD_API_URL
+).replace(/\/+$/, "").replace(/\/api$/, "");
 const isDev =
   typeof __DEV__ !== "undefined"
     ? __DEV__

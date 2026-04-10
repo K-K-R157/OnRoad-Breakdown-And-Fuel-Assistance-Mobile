@@ -150,7 +150,12 @@ export default function RoleHomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView
+      style={[
+        styles.safeArea,
+        { paddingTop: insets.top, paddingBottom: insets.bottom },
+      ]}
+    >
       {/* App Header - Branded */}
       <View style={styles.appHeader}>
         <View style={styles.appHeaderLeft}>
@@ -222,6 +227,7 @@ export default function RoleHomeScreen() {
           token={session?.token}
           activeTab={activeTab}
           mechanicId={session?.user?._id}
+          bottomInset={insets.bottom}
         />
       )}
       {role === "fuelStation" && (
@@ -229,6 +235,7 @@ export default function RoleHomeScreen() {
           token={session?.token}
           activeTab={activeTab}
           stationId={session?.user?._id}
+          bottomInset={insets.bottom}
         />
       )}
       {role === "chargingStation" && (
@@ -236,6 +243,7 @@ export default function RoleHomeScreen() {
           token={session?.token}
           activeTab={activeTab}
           stationId={session?.user?._id}
+          bottomInset={insets.bottom}
         />
       )}
       {role === "admin" && (
@@ -299,7 +307,7 @@ export default function RoleHomeScreen() {
 }
 
 // ============== MECHANIC PANEL ==============
-function MechanicPanel({ token, activeTab, mechanicId }) {
+function MechanicPanel({ token, activeTab, mechanicId, bottomInset = 0 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -1075,7 +1083,12 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
                 numberOfLines={3}
               />
             </ScrollView>
-            <View style={styles.modalButtonsFixed}>
+            <View
+              style={[
+                styles.modalButtonsFixed,
+                { paddingBottom: spacing.lg + bottomInset },
+              ]}
+            >
               <Button
                 title="Cancel"
                 variant="outline"
@@ -1109,7 +1122,7 @@ function MechanicPanel({ token, activeTab, mechanicId }) {
 }
 
 // ============== FUEL STATION PANEL ==============
-function FuelPanel({ token, activeTab, stationId }) {
+function FuelPanel({ token, activeTab, stationId, bottomInset = 0 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -2063,7 +2076,12 @@ function FuelPanel({ token, activeTab, stationId }) {
                 </>
               )}
             </ScrollView>
-            <View style={styles.modalButtonsFixed}>
+            <View
+              style={[
+                styles.modalButtonsFixed,
+                { paddingBottom: spacing.lg + bottomInset },
+              ]}
+            >
               <Button
                 title="Cancel"
                 variant="outline"
@@ -2097,7 +2115,7 @@ function FuelPanel({ token, activeTab, stationId }) {
 }
 
 // ============== CHARGING STATION PANEL ==============
-function ChargingPanel({ token, activeTab, stationId }) {
+function ChargingPanel({ token, activeTab, stationId, bottomInset = 0 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -3090,7 +3108,12 @@ function ChargingPanel({ token, activeTab, stationId }) {
                 </>
               )}
             </ScrollView>
-            <View style={styles.modalButtonsFixed}>
+            <View
+              style={[
+                styles.modalButtonsFixed,
+                { paddingBottom: spacing.lg + bottomInset },
+              ]}
+            >
               <Button
                 title="Cancel"
                 variant="outline"

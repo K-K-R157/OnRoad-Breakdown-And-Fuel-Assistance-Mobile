@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "expo start",
+    "start": "cross-env EXPO_PUBLIC_API_BASE_URL=https://onroad-breakdown-g3brh6bbgqguefc3.southeastasia-01.azurewebsites.net/api expo start",
     "start:device": "cross-env EXPO_PUBLIC_API_BASE_URL=http://10.1.9.26:5000/api expo start",
     "start:device:tunnel": "cross-env EXPO_PUBLIC_API_BASE_URL=http://10.1.9.26:5000/api expo start --tunnel",
     "android": "cross-env EXPO_PUBLIC_API_BASE_URL=http://10.3.1.141:5000/api expo start --android",

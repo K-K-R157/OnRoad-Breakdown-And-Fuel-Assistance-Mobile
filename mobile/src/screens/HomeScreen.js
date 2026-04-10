@@ -108,11 +108,14 @@ export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView
+      style={[
+        styles.safeArea,
+        { paddingTop: insets.top, paddingBottom: insets.bottom },
+      ]}
+    >
       {/* Header with Login */}
-      <View
-        style={[styles.header, { paddingTop: insets.top > 0 ? 0 : spacing.sm }]}
-      >
+      <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.logoCircle}>
             <Ionicons name="car-sport" size={20} color="#b91c1c" />

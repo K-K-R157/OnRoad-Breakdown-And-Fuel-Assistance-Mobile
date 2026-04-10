@@ -95,7 +95,12 @@ export default function UserHomeScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView
+      style={[
+        styles.safeArea,
+        { paddingTop: insets.top, paddingBottom: insets.bottom },
+      ]}
+    >
       {/* App Header */}
       <View style={styles.appHeader}>
         <View style={styles.appLogoRow}>
