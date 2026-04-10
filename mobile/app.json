@@ -4,20 +4,20 @@
     "slug": "OnRoad-Assistance",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/favicon.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#76727a"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/favicon.png",
-        "backgroundColor": "#0a1014"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#141c21"
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",
